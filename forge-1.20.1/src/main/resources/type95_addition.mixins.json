@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.type95addition.client.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "type95_addition.refmap.json",
+  "client": [
+    "ItemInHandRendererMixin",
+    "MinecraftMixin",
+    "PlayerModelMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,18 @@
+# Dev-only mod: the screenshot harness (src/clienttest). Not part of the addon's jar; only runs via
+# ./gradlew runClientTest, which sets -Dt95.clienttest=true.
+modLoader = "javafml"
+loaderVersion = "[47,)"
+license = "All Rights Reserved"
+
+[[mods]]
+modId = "t95_clienttest"
+version = "1.0.0"
+displayName = "Type 95 Addition Client Test Harness"
+description = '''Dev-only screenshot harness for Type 95 Addition.'''
+
+[[dependencies.t95_clienttest]]
+modId = "type95_addition"
+mandatory = true
+versionRange = "[1,)"
+ordering = "AFTER"
+side = "BOTH"

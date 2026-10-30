@@ -1,0 +1,99 @@
+// Type 95 Addition: an unofficial addon for Type 95 Sniper Rifle (Fabric, Minecraft 1.21.11), built with Loom.
+//
+//   ./gradlew build        -> build/libs/type95_addition-<version>.jar
+//   ./gradlew runClient    -> a dev game with this addon (and Type 95 + Rimulib, if their jars are in libs/)
+//
+// The addon never touches Type 95's own (obfuscated) classes: it only needs the rifle's item id, so nothing of
+// Type 95 is needed to compile. Minecraft 1.21.11 is still obfuscated, so this is the classic remapping Loom with
+// Mojang's mappings; the release jar is remapped to intermediary.
+plugins {
+    id 'fabric-loom' version "${loom_version}"
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+}
+
+// Dev-only: the automated screenshot harness (src/clienttest), its own second mod, loaded only by the 'clientTest'
+// run below and never built into the release jar.
+sourceSets {
+    clienttest {}
+}
+
+loom {
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+        t95_clienttest {
+            sourceSet sourceSets.clienttest
+        }
+    }
+    runs {
+        // ./gradlew runClientTest [-Dt95.clienttest.power=3 -Dt95.clienttest.palette=violet]
+        // Opens run/clienttest, makes a flat world, charges the Lightning Formula through its four stages, fires it
+        // and takes screenshots (run/clienttest/screenshots), then quits.
+        clientTest {
+            client()
+            source sourceSets.clienttest
+            runDir 'run/clienttest'
+            property 't95.clienttest', 'true'
+            ['power', 'palette', 'damage', 'bolts', 'og', 'scope', 'mark'].each { key ->
+                var name = "t95.clienttest.${key}"
+                var value = project.findProperty(name) ?: System.getProperty(name)
+                if (value != null) {
+                    property name, value.toString()
+                }
+            }
+        }
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+    // Dev runs only: Type 95 (its Fabric 1.21.11 classes are in the multi-loader jar) and Rimulib's 1.21.11 build
+    // (nested in its Fabric jar; take it out with: unzip -j rimulib-*-fabric.jar 'META-INF/jars/*1.21.11*' -d libs/dev)
+    modLocalRuntime fileTree(dir: 'libs/dev', include: '*.jar')
+    // Rimulib (Type 95's library, always installed with it): its post-processing (bloom, flash, shaders) and its
+    // streamed terrain carving. Its API has readable names, unlike Type 95's own classes.
+    modCompileOnly fileTree(dir: 'libs/dev', include: 'rimulib-*.jar')
+
+    clienttestImplementation sourceSets.main.output
+}
+configurations {
+    clienttestCompileClasspath.extendsFrom compileClasspath
+    clienttestRuntimeClasspath.extendsFrom runtimeClasspath
+}
+
+processResources {
+    var replaceProperties = [version: project.mod_version]
+    inputs.properties replaceProperties
+    filesMatching('fabric.mod.json') {
+        expand replaceProperties
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+    it.options.encoding = 'UTF-8'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+    // Loom itself needs Java 25 to run Gradle, but the game (dev runs) must run on 21: Minecraft 1.21.11's LWJGL
+    // can't start GLFW on 25 ("Unsupported JNI version")
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}

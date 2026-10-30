@@ -1,0 +1,103 @@
+{
+  "charge_loop": {
+    "sounds": [
+      {
+        "name": "type95_addition:charge_loop",
+        "stream": false
+      }
+    ],
+    "subtitle": "subtitles.type95_addition.charge_loop"
+  },
+  "charge_start": {
+    "sounds": [
+      "type95_addition:charge_start"
+    ],
+    "subtitle": "subtitles.type95_addition.charge_start"
+  },
+  "stage_up": {
+    "sounds": [
+      "type95_addition:stage_up"
+    ],
+    "subtitle": "subtitles.type95_addition.stage_up"
+  },
+  "full_charge": {
+    "sounds": [
+      "type95_addition:full_charge"
+    ],
+    "subtitle": "subtitles.type95_addition.full_charge"
+  },
+  "full_loop": {
+    "sounds": [
+      "type95_addition:full_loop"
+    ],
+    "subtitle": "subtitles.type95_addition.full_loop"
+  },
+  "fizzle": {
+    "sounds": [
+      "type95_addition:fizzle"
+    ],
+    "subtitle": "subtitles.type95_addition.fizzle"
+  },
+  "fire": {
+    "sounds": [
+      "type95_addition:fire"
+    ],
+    "subtitle": "subtitles.type95_addition.fire"
+  },
+  "thunder_near": {
+    "sounds": [
+      {
+        "name": "type95_addition:thunder_near",
+        "attenuation_distance": 256
+      }
+    ],
+    "subtitle": "subtitles.type95_addition.thunder"
+  },
+  "thunder_far": {
+    "sounds": [
+      {
+        "name": "type95_addition:thunder_far",
+        "attenuation_distance": 1024
+      }
+    ],
+    "subtitle": "subtitles.type95_addition.thunder"
+  },
+  "zap": {
+    "sounds": [
+      "type95_addition:zap_1",
+      "type95_addition:zap_2",
+      "type95_addition:zap_3"
+    ],
+    "subtitle": "subtitles.type95_addition.zap"
+  },
+  "shockwave": {
+    "sounds": [
+      {
+        "name": "type95_addition:shockwave",
+        "attenuation_distance": 512
+      }
+    ],
+    "subtitle": "subtitles.type95_addition.shockwave"
+  },
+  "dome": {
+    "sounds": [
+      {
+        "name": "type95_addition:dome",
+        "attenuation_distance": 256
+      }
+    ],
+    "subtitle": "subtitles.type95_addition.dome"
+  },
+  "mark": {
+    "sounds": [
+      "type95_addition:mark"
+    ],
+    "subtitle": "subtitles.type95_addition.mark"
+  },
+  "scope": {
+    "sounds": [
+      "type95_addition:scope"
+    ],
+    "subtitle": "subtitles.type95_addition.scope"
+  }
+}

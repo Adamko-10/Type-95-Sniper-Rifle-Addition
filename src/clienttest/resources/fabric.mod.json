@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "t95_clienttest",
+  "version": "1.0.0",
+  "name": "Type 95 Addition test harness",
+  "description": "Dev-only automated screenshot harness. Never shipped, only loaded by the clientTest Gradle run.",
+  "license": "All-Rights-Reserved",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["dev.type95addition.clienttest.Harness"]
+  },
+  "depends": {
+    "type95_addition": "*"
+  }
+}

@@ -1,0 +1,18 @@
+.gradle/
+build/
+out/
+run/
+.idea/
+*.iml
+.vscode/
+bin/
+# Type 95 and Rimulib are their authors' (All Rights Reserved): local copies for dev runs only, never committed
+libs/**/*.jar
+dev/tools/*.jar
+forge-1.20.1/libs/**/*.jar
+forge-1.20.1/.gradle/
+forge-1.20.1/build/
+forge-1.20.1/run/
+# release jars go on GitHub Releases, not in git
+releases/
+forge-1.20.1/libs/off/

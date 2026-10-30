@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "type95_addition",
+  "version": "${version}",
+  "name": "Type 95 Addition",
+  "description": "An unofficial addon for the Type 95 Sniper Rifle. Adds a second ammo type, the Lightning Formula: press R with the rifle to switch, hold right click and lightning gathers around the gun in four stages, let go and a lightning strike comes down where you aim. Power up to 20x (twice the original's top), damage, bolts, fire, scorched ground, the crater, colours and effects are all adjustable (J with the rifle in hand), with server limits in config/type95_addition-server.json.",
+  "authors": [],
+  "license": "All-Rights-Reserved",
+  "icon": "type95_addition_icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "dev.type95addition.Type95Addition"
+    ],
+    "client": [
+      "dev.type95addition.client.AdditionClient"
+    ]
+  },
+  "mixins": [
+    {
+      "config": "type95_addition.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.17.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*",
+    "tanya_demo": ">=1.0.1",
+    "rimulib": ">=1.1.0"
+  }
+}

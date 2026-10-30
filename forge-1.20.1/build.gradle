@@ -1,0 +1,234 @@
+// Type 95 Addition: an unofficial addon for Type 95 Sniper Rifle (Forge 1.20.1, also NeoForge 1.20.1), built with
+// ModDevGradle's legacy plugin (the same setup as The Shooting Star Addition's forge-1.20.1 branch).
+//
+//   ./gradlew build          -> build/libs/type95_addition-<version>.jar (reobfuscated to SRG names)
+//   ./gradlew runClient      -> a dev game with this addon, Type 95 and Rimulib (their jars in libs/)
+//   ./gradlew runClientTest  -> the screenshot harness (src/clienttest), see the clientTest run below
+//
+// The Java code is the Fabric 1.21.11 build's (../src/main/java) ported to 1.20.1; the assets are shared with it
+// (../src/main/resources), apart from the few files Forge 1.20.1 needs its own of (src/main/resources).
+// Like the Fabric build it never touches Type 95's own (obfuscated) classes: only its rifle's item id.
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev.legacyforge' version '2.0.+'
+}
+
+version = mod_version
+group = maven_group
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+sourceSets {
+    main {
+        resources {
+            srcDir '../src/main/resources'
+            exclude 'fabric.mod.json'
+        }
+    }
+    clienttest {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+// (the Fabric build's own mixin config has the same name as ours: ours, in src/main/resources, wins)
+tasks.named('processResources', ProcessResources) {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+configurations {
+    clienttestCompileOnly.extendsFrom compileOnly
+    clienttestImplementation.extendsFrom implementation
+    clienttestRuntimeOnly.extendsFrom runtimeOnly
+}
+
+// ---- Type 95 and Rimulib in a dev game ----------------------------------------------------------------------------
+// Their jars go in libs/ (never committed or shipped). Forge 1.20.1 runs with SRG names and the dev game with
+// Mojang's, so they go through the remapping configurations, which only take modules: each jar is copied to
+// build/dev-mods and named as a flatDir module. Their mixin configs name their targets by SRG name with no refmap,
+// so in a dev game they would find nothing: each copy gets an empty refmap per mixin config, and the runs remap the
+// refmaps' SRG names to Mojang's (mixin.env.remapRefMap, with the SRG-to-Mojang file devSrg makes).
+var devModsDir = layout.buildDirectory.dir('dev-mods').get().asFile
+var devMods = []
+fileTree(dir: 'libs', include: '*.jar').files.sort { it.name }.each { File source ->
+    File copy = new File(devModsDir, source.name)
+    if (!copy.exists() || copy.lastModified() < source.lastModified()) {
+        devModsDir.mkdirs()
+        var configs = []
+        new java.util.zip.ZipFile(source).withCloseable { zip ->
+            zip.entries().each { e ->
+                if (!e.directory && e.name.endsWith('.mixins.json') && !e.name.contains('/')
+                    && new groovy.json.JsonSlurper().parse(zip.getInputStream(e), 'UTF-8').refmap == null) {
+                    configs << e.name
+                }
+            }
+        }
+        new java.util.zip.ZipOutputStream(new FileOutputStream(copy)).withCloseable { out ->
+            new java.util.zip.ZipFile(source).withCloseable { zip ->
+                zip.entries().each { e ->
+                    byte[] bytes = zip.getInputStream(e).bytes
+                    if (e.name in configs) {
+                        var config = new groovy.json.JsonSlurper().parse(bytes, 'UTF-8')
+                        var refmap = e.name.replace('.mixins.json', '.dev-refmap.json')
+                        config.refmap = refmap
+                        bytes = groovy.json.JsonOutput.toJson(config).getBytes('UTF-8')
+                        out.putNextEntry(new java.util.zip.ZipEntry(refmap))
+                        out.write('{"mappings":{},"data":{}}'.getBytes('UTF-8'))
+                        out.closeEntry()
+                    }
+                    out.putNextEntry(new java.util.zip.ZipEntry(e.name))
+                    if (!e.directory) {
+                        out.write(bytes)
+                    }
+                    out.closeEntry()
+                }
+            }
+        }
+        logger.lifecycle("Dev copy of ${source.name}: empty refmaps for ${configs}")
+    }
+    devMods << copy
+}
+
+repositories {
+    flatDir { dirs devModsDir }
+}
+
+legacyForge {
+    // The same jar runs on NeoForge 1.20.1 (which still reports itself as forge 47.1): ./gradlew -Pneoforge ...
+    // builds and runs against NeoForge 1.20.1 instead.
+    if (project.hasProperty('neoforge')) {
+        enable {
+            neoForgeVersion = project.neoforge_version
+        }
+    } else {
+        version = project.forge_version
+    }
+    addModdingDependenciesTo sourceSets.clienttest
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+        t95_clienttest {
+            sourceSet(sourceSets.clienttest)
+        }
+    }
+
+    runs {
+        client {
+            client()
+            gameDirectory = project.file('run')
+            loadedMods = [mods."${mod_id}"]
+        }
+        server {
+            server()
+            programArgument '--nogui'
+            gameDirectory = project.file('run/server')
+            loadedMods = [mods."${mod_id}"]
+        }
+        // ./gradlew runClientTest [-Dt95.clienttest.power=3 -Dt95.clienttest.palette=violet ...]: makes a flat
+        // world, charges the Lightning Formula through its four stages, fires it, takes screenshots
+        // (run/clienttest/screenshots) and quits.
+        clientTest {
+            client()
+            gameDirectory = project.file('run/clienttest')
+            systemProperty 't95.clienttest', 'true'
+            systemProperty 'fml.earlyWindowControl', 'false'
+            ['power', 'palette', 'damage', 'bolts', 'scope', 'mark'].each { key ->
+                var name = "t95.clienttest.${key}"
+                var value = project.findProperty(name) ?: System.getProperty(name)
+                if (value != null) {
+                    systemProperty name, value.toString()
+                }
+            }
+            loadedMods = [mods."${mod_id}", mods.t95_clienttest]
+        }
+        configureEach {
+            logLevel = org.slf4j.event.Level.INFO
+            systemProperty 'mixin.env.remapRefMap', 'true'
+            systemProperty 'mixin.env.refMapRemappingFile', project.layout.buildDirectory.file('dev-srg/srg-to-named.srg').get().asFile.absolutePath
+        }
+    }
+}
+
+var devSrg = tasks.register('devSrg') {
+    description = 'SRG to Mojang names, the way Mixin reads them, for the refmaps in the dev runs'
+    dependsOn 'createMinecraftArtifacts'
+    var from = layout.buildDirectory.file('moddev/artifacts/namedToIntermediate.tsrg')
+    var to = layout.buildDirectory.file('dev-srg/srg-to-named.srg')
+    outputs.file(to)
+    doLast {
+        var out = new StringBuilder()
+        String owner = null
+        from.get().asFile.eachLine('UTF-8') { line ->
+            if (line.isBlank() || line.startsWith('#') || line.startsWith('tsrg2 ') || line.startsWith('\t\t')) {
+                return
+            }
+            if (!line.startsWith('\t')) {
+                owner = line.split(' ')[0]
+                return
+            }
+            var p = line.trim().split(' ')
+            if (p.length == 3 && p[1].startsWith('(')) {
+                out << "MD: ${owner}/${p[2]} ${p[1]} ${owner}/${p[0]} ${p[1]}\n"
+            } else if (p.length >= 2) {
+                out << "FD: ${owner}/${p[-1]} ${owner}/${p[0]}\n"
+            }
+        }
+        to.get().asFile.parentFile.mkdirs()
+        to.get().asFile.setText(out.toString(), 'UTF-8')
+    }
+}
+tasks.matching { it.name.startsWith('prepare') && it.name.endsWith('Run') }.configureEach {
+    dependsOn devSrg
+}
+
+dependencies {
+    devMods.each { File jar ->
+        var module = "local:${jar.name - '.jar'}:0"
+        modRuntimeOnly module
+        // Rimulib: its post-processing (bloom, flash, our shaders) and its streamed terrain carving
+        if (jar.name.startsWith('rimulib')) {
+            modCompileOnly module
+        }
+    }
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+
+// Forge 1.20.1 runs with SRG names, so the mixins need a refmap; and it reads mixin configs from the manifest only.
+mixin {
+    add sourceSets.main, "${mod_id}.refmap.json"
+    config "${mod_id}.mixins.json"
+}
+tasks.named('jar', Jar) {
+    manifest.attributes(['MixinConfigs': "${mod_id}.mixins.json"])
+}
+
+// mods.toml is filled in from gradle.properties.
+var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
+    var replaceProperties = [
+        minecraft_version_range: minecraft_version_range,
+        forge_version_range    : forge_version_range,
+        loader_version_range   : loader_version_range,
+        mod_id                 : mod_id,
+        mod_version            : mod_version,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from 'src/main/templates'
+    into 'build/generated/sources/modMetadata'
+}
+sourceSets.main.resources.srcDir generateModMetadata
+legacyForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-Xmaxerrs' << '1000'
+}
