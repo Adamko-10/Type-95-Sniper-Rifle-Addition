@@ -5,6 +5,7 @@ import dev.type95addition.Type95Addition;
 import dev.type95addition.client.anim.RifleAnim;
 import dev.type95addition.client.fx.ArcParticle;
 import dev.type95addition.client.fx.ChargeFx;
+import dev.type95addition.client.fx.HomingFx;
 import dev.type95addition.client.fx.MarkFx;
 import dev.type95addition.client.fx.StormFx;
 import dev.type95addition.client.fx.StrikeFx;
@@ -12,6 +13,8 @@ import dev.type95addition.net.AddonNetwork;
 import dev.type95addition.net.BoltPayload;
 import dev.type95addition.net.ChargeSyncPayload;
 import dev.type95addition.net.CooldownPayload;
+import dev.type95addition.net.CrushPayload;
+import dev.type95addition.net.HomingPayload;
 import dev.type95addition.net.SettingsPayload;
 import dev.type95addition.net.StrikePayload;
 import net.minecraft.client.KeyMapping;
@@ -67,6 +70,12 @@ public final class AdditionClient {
                 StrikeFx.onStrike(strike);
             } else if (payload instanceof BoltPayload bolt) {
                 StrikeFx.onBolt(bolt);
+            } else if (payload instanceof HomingPayload homing) {
+                HomingFx.onHoming(homing);
+            } else if (payload instanceof CrushPayload crush) {
+                HomingFx.onCrush(crush);
+            } else if (payload instanceof dev.type95addition.net.GaussPayload gauss) {
+                dev.type95addition.client.fx.GaussFx.onShot(gauss);
             }
         };
 
@@ -75,6 +84,8 @@ public final class AdditionClient {
         bus.addListener((ClientPlayerNetworkEvent.LoggingOut event) -> {
             ChargeClient.reset();
             StrikeFx.clear();
+            HomingFx.clear();
+            dev.type95addition.client.fx.GaussFx.clear();
         });
         bus.addListener((TickEvent.ClientTickEvent event) -> {
             if (event.phase == TickEvent.Phase.END) {
@@ -140,6 +151,8 @@ public final class AdditionClient {
             StrikeFx.tick(mc);
             RifleAnim.tick(mc);
             MarkFx.tick(mc);
+            HomingFx.tick(mc);
+            dev.type95addition.client.fx.GaussFx.tick(mc);
         }
     }
 }

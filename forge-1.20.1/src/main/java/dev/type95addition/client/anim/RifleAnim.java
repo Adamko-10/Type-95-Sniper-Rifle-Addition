@@ -35,7 +35,7 @@ public final class RifleAnim {
         }
         for (var player : mc.level.players()) {
             int id = player.getId();
-            boolean charging = ChargeFx.held(id) >= 0;
+            boolean charging = ChargeFx.held(id) >= 0 || dev.type95addition.client.fx.GaussFx.held(id) >= 0;
             boolean recoiling = recoilAge(id, 0.0F) < RECOIL_TICKS;
             float[] w = AIM.computeIfAbsent(id, k -> new float[2]);
             w[0] = w[1];

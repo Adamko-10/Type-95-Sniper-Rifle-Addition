@@ -13,14 +13,21 @@ import java.nio.file.Path;
 import net.minecraftforge.fml.loading.FMLPaths;
 
 /**
- * The player's own settings, {@code config/type95_addition-client.json}: the ammo picked, the Lightning Formula's
- * settings (sent to the server, which holds them to its limits) and the purely visual switches. Changed in game
- * with the J screen; editing the file works too (read when the game starts).
+ * The player's own settings, {@code config/type95_addition-client.json}: the ammo picked (explosion, lightning,
+ * homing or gauss), the Lightning Formula's settings (sent to the server, which holds them to its limits) and the purely
+ * visual switches. Changed in game with the J screen; editing the file works too (read when the game starts).
  */
 public final class ClientConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    public static boolean lightning = true;
+    public static final int EXPLOSION = 0;
+    public static final int LIGHTNING = 1;
+    public static final int HOMING = 2;
+    public static final int GAUSS = 3;
+    private static final String[] AMMO_KEYS = {"explosion", "lightning", "homing", "gauss"};
+
+    /** The ammo in the rifle (R switches): the rifle's own Explosion Formula, or one of the addon's. */
+    public static int ammo = LIGHTNING;
     public static float power = LightningTuning.DEFAULT.power();
     /** {@link LightningTuning#INFINITE} for True Erasure (stored as -1 in the file). */
     public static float damage = LightningTuning.DEFAULT.damage();
@@ -36,6 +43,8 @@ public final class ClientConfig {
     public static boolean scope = false;
     /** While charging, left click (or hold it) marks where the strike lands: a mob, a block or the sky. */
     public static boolean marking = true;
+    /** The Gauss Formula's slug goes through blocks softer than stone (if the server allows it). */
+    public static boolean gaussBlocks = LightningTuning.DEFAULT.gaussBlocks();
 
     private ClientConfig() {
     }
@@ -45,7 +54,7 @@ public final class ClientConfig {
     }
 
     public static LightningTuning tuning() {
-        return new LightningTuning(power, damage, bolts, fire, terrain, blast);
+        return new LightningTuning(power, damage, bolts, fire, terrain, blast, gaussBlocks);
     }
 
     public static void load() {
@@ -53,7 +62,10 @@ public final class ClientConfig {
         if (Files.isRegularFile(path)) {
             try {
                 JsonObject o = JsonParser.parseString(Files.readString(path, StandardCharsets.UTF_8)).getAsJsonObject();
-                lightning = bool(o, "lightning_ammo", lightning);
+                ammo = bool(o, "lightning_ammo", true) ? LIGHTNING : EXPLOSION;
+                if (o.has("ammo")) {
+                    ammo = Math.max(0, java.util.Arrays.asList(AMMO_KEYS).indexOf(o.get("ammo").getAsString()));
+                }
                 power = (float)number(o, "power", power);
                 double d = number(o, "damage", damage);
                 damage = d < 0.0 ? LightningTuning.INFINITE : (float)d;
@@ -67,6 +79,7 @@ public final class ClientConfig {
                 zoom = bool(o, "zoom_while_charging", zoom);
                 scope = bool(o, "scope", scope);
                 marking = bool(o, "mark_with_left_click", marking);
+                gaussBlocks = bool(o, "gauss_through_blocks", gaussBlocks);
             } catch (IOException | RuntimeException e) {
                 Type95Addition.LOGGER.warn("Could not read {}, using the defaults: {}", path, e.toString());
             }
@@ -76,7 +89,7 @@ public final class ClientConfig {
 
     public static void save() {
         JsonObject o = new JsonObject();
-        o.addProperty("lightning_ammo", lightning);
+        o.addProperty("ammo", AMMO_KEYS[ammo]);
         o.addProperty("power", power);
         o.addProperty("damage", damage == LightningTuning.INFINITE ? -1.0 : damage);
         o.addProperty("bolts", bolts);
@@ -89,6 +102,7 @@ public final class ClientConfig {
         o.addProperty("zoom_while_charging", zoom);
         o.addProperty("scope", scope);
         o.addProperty("mark_with_left_click", marking);
+        o.addProperty("gauss_through_blocks", gaussBlocks);
         try {
             Files.createDirectories(path().getParent());
             Files.writeString(path(), GSON.toJson(o), StandardCharsets.UTF_8);

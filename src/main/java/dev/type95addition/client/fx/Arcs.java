@@ -84,7 +84,7 @@ public final class Arcs {
         ArcParticle.spawn(level, at.x, at.y, at.z, d.x, d.y, d.z, rgb, size, life, 1.0F);
     }
 
-    private static void line(ClientLevel level, Vec3 a, Vec3 b, double spacing, int glow, int core, float size, int life) {
+    static void line(ClientLevel level, Vec3 a, Vec3 b, double spacing, int glow, int core, float size, int life) {
         double len = a.distanceTo(b);
         int dots = Math.max(1, (int)Math.ceil(len / spacing));
         for (int i = 0; i < dots; i++) {

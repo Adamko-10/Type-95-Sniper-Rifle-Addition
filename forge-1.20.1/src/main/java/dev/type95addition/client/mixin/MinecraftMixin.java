@@ -36,4 +36,12 @@ abstract class MinecraftMixin {
             ci.cancel();
         }
     }
+
+    @Inject(method = "shouldEntityAppearGlowing", at = @At("RETURN"), cancellable = true)
+    private void type95addition$crushGlow(net.minecraft.world.entity.Entity entity, CallbackInfoReturnable<Boolean> cir) {
+        if (!cir.getReturnValue() && (dev.type95addition.client.fx.HomingFx.outlined(entity)
+            || dev.type95addition.client.fx.GaussFx.targeted(entity))) {
+            cir.setReturnValue(true);
+        }
+    }
 }

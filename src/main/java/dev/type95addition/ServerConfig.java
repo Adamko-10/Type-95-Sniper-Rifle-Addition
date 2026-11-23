@@ -37,6 +37,7 @@ public final class ServerConfig {
         option("fire", true, "Players may turn on fire.");
         option("terrain", true, "Players may turn on terrain scorching (also needs the mobGriefing game rule).");
         option("blast", true, "Players may turn on the thunderclap blast (it only breaks blocks with terrain on too).");
+        option("gauss_blocks", true, "Players may let the Gauss Formula punch through blocks softer than stone (glass, leaves, wood, wool...; up to 12). It breaks the glass and leaves it goes through only with the mobGriefing game rule on.");
         option("survival", true, "Survival players may use the Lightning Formula (creative players always can).");
     }
 
@@ -156,6 +157,10 @@ public final class ServerConfig {
 
     public static boolean blast() {
         return flag("blast");
+    }
+
+    public static boolean gaussBlocks() {
+        return flag("gauss_blocks");
     }
 
     public static boolean survival() {

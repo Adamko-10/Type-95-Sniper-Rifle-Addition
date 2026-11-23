@@ -1,6 +1,7 @@
 package dev.type95addition;
 
 import dev.type95addition.net.AddonNetwork;
+import dev.type95addition.world.HomingShot;
 import dev.type95addition.world.LightningCasting;
 import dev.type95addition.world.LightningStrike;
 import net.fabricmc.api.ModInitializer;
@@ -37,6 +38,7 @@ public final class Type95Addition implements ModInitializer {
     public static final Identifier RIFLE = Identifier.fromNamespaceAndPath("tanya_demo", "type95_rifle");
 
     public static final ResourceKey<DamageType> LIGHTNING_FORMULA = ResourceKey.create(Registries.DAMAGE_TYPE, id("lightning_formula"));
+    public static final ResourceKey<DamageType> HOMING_FORMULA = ResourceKey.create(Registries.DAMAGE_TYPE, id("homing_formula"));
 
     /** The arcs of every charge and strike (drawn by {@code client.fx.ArcParticle}; spawned on the client only). */
     public static final SimpleParticleType ARC = Registry.register(BuiltInRegistries.PARTICLE_TYPE, id("arc"), FabricParticleTypes.simple(true));
@@ -53,11 +55,13 @@ public final class Type95Addition implements ModInitializer {
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             LightningCasting.tick(server);
             LightningStrike.tickAll();
+            HomingShot.tickAll();
         });
         ServerLifecycleEvents.SERVER_STARTING.register(server -> ServerConfig.load());
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             LightningCasting.clear();
             LightningStrike.clear();
+            HomingShot.clear();
         });
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> AddonNetwork.sendSettings(handler.getPlayer()));
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> LightningCasting.forget(handler.getPlayer()));

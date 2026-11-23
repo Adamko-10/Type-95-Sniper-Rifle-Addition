@@ -15,12 +15,18 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
 /**
- * The Lightning Formula's settings (J): power, damage and bolts like Type 95's own sliders, the fire / terrain /
- * blast switches (greyed out when the server doesn't allow them), the colour, and the client-only effects.
+ * The addon's settings (J): the Lightning Formula's power, damage and bolts like Type 95's own sliders, the fire /
+ * terrain / blast switches (greyed out when the server doesn't allow them), the colour, the client-only effects, and
+ * whether the Gauss Formula goes through blocks.
  * Saved and sent to the server when the screen closes.
  */
 public final class LightningScreen extends Screen {
-    private static final int ROW = 24;
+    /** Rows of buttons, and what's under them: title 16, info lines 2 + 3 x 11. */
+    private static final int ROWS = 9;
+    private static final int CHROME = 16 + 2 + 33;
+    /** Row height (24, down to 21 so it all fits in small windows) and the first row's y. */
+    private int row = 24;
+    private int top;
     private static final int WIDTH = 304;
     private static final int HALF = 150;
 
@@ -32,37 +38,41 @@ public final class LightningScreen extends Screen {
     protected void init() {
         int left = this.width / 2 - WIDTH / 2;
         int right = left + WIDTH - HALF;
-        int y = Math.max(28, this.height / 2 - 112);
+        this.row = Math.max(21, Math.min(24, (this.height - CHROME) / ROWS));
+        this.top = Math.max(18, (this.height - ROWS * this.row - CHROME) / 2 + 16);
+        int y = this.top;
 
         this.addRenderableWidget(new Slider(left, y, WIDTH, powerToSlider(ClientConfig.power), v -> ClientConfig.power = sliderToPower(v),
             () -> Component.translatable("gui.type95_addition.power", String.format(Locale.ROOT, "%.1fx", ClientConfig.power))));
-        y += ROW;
+        y += this.row;
         this.addRenderableWidget(new Slider(left, y, WIDTH, damageToSlider(ClientConfig.damage), v -> ClientConfig.damage = sliderToDamage(v),
             () -> ClientConfig.damage == LightningTuning.INFINITE
                 ? Component.translatable("gui.type95_addition.damage.infinite").withStyle(ChatFormatting.LIGHT_PURPLE)
                 : Component.translatable("gui.type95_addition.damage", Math.round(ClientConfig.damage))));
-        y += ROW;
+        y += this.row;
         this.addRenderableWidget(new Slider(left, y, WIDTH, (ClientConfig.bolts - 1) / 15.0,
             v -> ClientConfig.bolts = 1 + (int)Math.round(v * 15.0),
             () -> Component.translatable("gui.type95_addition.bolts", ClientConfig.bolts)));
-        y += ROW;
+        y += this.row;
 
         this.toggle(left, y, "fire", ClientConfig.fire, ChargeClient.serverFire, v -> ClientConfig.fire = v);
         this.toggle(right, y, "terrain", ClientConfig.terrain, ChargeClient.serverTerrain, v -> ClientConfig.terrain = v);
-        y += ROW;
+        y += this.row;
         this.toggle(left, y, "blast", ClientConfig.blast, ChargeClient.serverBlast, v -> ClientConfig.blast = v);
         this.addRenderableWidget(CycleButton.builder(Palette::label, ClientConfig.palette)
             .withValues(List.of(Palette.values()))
             .create(right, y, HALF, 20, Component.translatable("gui.type95_addition.palette"), (button, value) -> ClientConfig.palette = value));
-        y += ROW;
+        y += this.row;
         this.toggle(left, y, "flash", ClientConfig.flash, true, v -> ClientConfig.flash = v);
         this.toggle(right, y, "shake", ClientConfig.shake, true, v -> ClientConfig.shake = v);
-        y += ROW;
+        y += this.row;
         this.toggle(left, y, "zoom", ClientConfig.zoom, true, v -> ClientConfig.zoom = v);
         this.toggle(right, y, "scope", ClientConfig.scope, true, v -> ClientConfig.scope = v);
-        y += ROW;
+        y += this.row;
         this.toggle(left, y, "marking", ClientConfig.marking, true, v -> ClientConfig.marking = v);
-        this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> this.onClose()).bounds(right, y, HALF, 20).build());
+        this.toggle(right, y, "gauss_blocks", ClientConfig.gaussBlocks, ChargeClient.serverGaussBlocks, v -> ClientConfig.gaussBlocks = v);
+        y += this.row;
+        this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> this.onClose()).bounds(this.width / 2 - HALF / 2, y, HALF, 20).build());
     }
 
     private void toggle(int x, int y, String key, boolean value, boolean allowed, Consumer<Boolean> set) {
@@ -75,9 +85,9 @@ public final class LightningScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
         super.render(g, mouseX, mouseY, partial);
-        int top = Math.max(28, this.height / 2 - 112);
+        int top = this.top;
         g.drawCenteredString(this.font, this.title.copy().withStyle(ChatFormatting.BOLD), this.width / 2, top - 16, 0xFF000000 | ClientConfig.palette.glow);
-        int y = top + ROW * 8 + 2;
+        int y = top + this.row * ROWS + 2;
         double scale = LightningTuning.scale(1.0F, ClientConfig.power);
         g.drawCenteredString(this.font, Component.translatable("gui.type95_addition.radius", Math.round(LightningTuning.radius(scale)),
             ClientConfig.blast ? String.valueOf(Math.round(LightningTuning.craterRadius(scale, 420.0))) : "-",

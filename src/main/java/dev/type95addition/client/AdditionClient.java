@@ -4,12 +4,15 @@ import com.mojang.blaze3d.platform.InputConstants;
 import dev.type95addition.Type95Addition;
 import dev.type95addition.client.fx.ArcParticle;
 import dev.type95addition.client.fx.ChargeFx;
+import dev.type95addition.client.fx.HomingFx;
 import dev.type95addition.client.fx.StormFx;
 import dev.type95addition.client.fx.StrikeFx;
 import dev.type95addition.client.anim.RifleAnim;
 import dev.type95addition.net.BoltPayload;
 import dev.type95addition.net.ChargeSyncPayload;
 import dev.type95addition.net.CooldownPayload;
+import dev.type95addition.net.CrushPayload;
+import dev.type95addition.net.HomingPayload;
 import dev.type95addition.net.SettingsPayload;
 import dev.type95addition.net.StrikePayload;
 import net.fabricmc.api.ClientModInitializer;
@@ -44,11 +47,17 @@ public final class AdditionClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(ChargeSyncPayload.TYPE, (payload, context) -> ChargeFx.sync(payload));
         ClientPlayNetworking.registerGlobalReceiver(StrikePayload.TYPE, (payload, context) -> StrikeFx.onStrike(payload));
         ClientPlayNetworking.registerGlobalReceiver(BoltPayload.TYPE, (payload, context) -> StrikeFx.onBolt(payload));
+        ClientPlayNetworking.registerGlobalReceiver(HomingPayload.TYPE, (payload, context) -> HomingFx.onHoming(payload));
+        ClientPlayNetworking.registerGlobalReceiver(CrushPayload.TYPE, (payload, context) -> HomingFx.onCrush(payload));
+        ClientPlayNetworking.registerGlobalReceiver(dev.type95addition.net.GaussPayload.TYPE, (payload, context) ->
+            dev.type95addition.client.fx.GaussFx.onShot(payload));
 
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> ChargeClient.sendTuning());
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             ChargeClient.reset();
             StrikeFx.clear();
+            HomingFx.clear();
+            dev.type95addition.client.fx.GaussFx.clear();
         });
 
         ClientTickEvents.END_CLIENT_TICK.register(AdditionClient::tick);
@@ -89,6 +98,8 @@ public final class AdditionClient implements ClientModInitializer {
             StrikeFx.tick(mc);
             RifleAnim.tick(mc);
             MarkFx.tick(mc);
+            HomingFx.tick(mc);
+            dev.type95addition.client.fx.GaussFx.tick(mc);
         }
     }
 }

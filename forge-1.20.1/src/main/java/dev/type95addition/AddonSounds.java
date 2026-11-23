@@ -6,7 +6,7 @@ import java.util.function.BiConsumer;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
 
-/** The Lightning Formula's own sounds (all synthesised by {@code dev/art/make_sounds.py}; see sounds.json). */
+/** The addon's own sounds (all synthesised by {@code dev/art/make_sounds.py} and {@code make_gauss_sounds.py}; see sounds.json). */
 public final class AddonSounds {
     private static final Map<ResourceLocation, SoundEvent> ALL = new LinkedHashMap<>();
 
@@ -24,6 +24,10 @@ public final class AddonSounds {
     public static final SoundEvent DOME = create("dome");
     public static final SoundEvent MARK = create("mark");
     public static final SoundEvent SCOPE = create("scope");
+    public static final SoundEvent GAUSS_WHINE = create("gauss_whine");
+    public static final SoundEvent GAUSS_STAGE = create("gauss_stage");
+    public static final SoundEvent GAUSS_CRACK = create("gauss_crack");
+    public static final SoundEvent GAUSS_BOOM = create("gauss_boom");
 
     private AddonSounds() {
     }

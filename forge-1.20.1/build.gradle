@@ -141,7 +141,7 @@ legacyForge {
             gameDirectory = project.file('run/clienttest')
             systemProperty 't95.clienttest', 'true'
             systemProperty 'fml.earlyWindowControl', 'false'
-            ['power', 'palette', 'damage', 'bolts', 'scope', 'mark'].each { key ->
+            ['power', 'palette', 'damage', 'bolts', 'scope', 'mark', 'homing', 'gauss'].each { key ->
                 var name = "t95.clienttest.${key}"
                 var value = project.findProperty(name) ?: System.getProperty(name)
                 if (value != null) {

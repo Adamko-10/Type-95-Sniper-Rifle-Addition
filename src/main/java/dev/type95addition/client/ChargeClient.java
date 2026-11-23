@@ -7,6 +7,8 @@ import dev.type95addition.net.ChargePayload;
 import dev.type95addition.net.CooldownPayload;
 import dev.type95addition.net.SettingsPayload;
 import dev.type95addition.net.TunePayload;
+import dev.type95addition.client.anim.RifleAnim;
+import dev.type95addition.world.HomingShot;
 import dev.type95addition.world.LightningCasting;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.ChatFormatting;
@@ -34,9 +36,12 @@ public final class ChargeClient {
     public static boolean serverFire = true;
     public static boolean serverTerrain = true;
     public static boolean serverBlast = true;
+    public static boolean serverGaussBlocks = true;
     private static boolean survivalAllowed = true;
 
     private static boolean charging;
+    /** The charge going on is the Gauss Formula's (else the lightning's). */
+    private static boolean gauss;
     private static int held;
     private static int cooldown;
     private static int cooldownTotal = 1;
@@ -51,7 +56,7 @@ public final class ChargeClient {
     public static boolean interceptUse() {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
-        if (player == null || !ClientConfig.lightning || player.isSpectator() || !Type95Addition.holdsRifle(player)) {
+        if (player == null || ClientConfig.ammo == ClientConfig.EXPLOSION || player.isSpectator() || !Type95Addition.holdsRifle(player)) {
             return false;
         }
         if (!ClientPlayNetworking.canSend(ChargePayload.TYPE)) {
@@ -64,8 +69,20 @@ public final class ChargeClient {
         if (charging) {
             return true;
         }
+        if (ClientConfig.ammo == ClientConfig.HOMING) {
+            // fires at once; held right click repeats, so a recharging rifle stays quiet
+            if (cooldown <= 0 && (player.isCreative() || survivalAllowed)) {
+                cooldown = cooldownTotal = HomingShot.COOLDOWN;
+                ClientPlayNetworking.send(new ChargePayload(ChargePayload.HOMING));
+                RifleAnim.fired(player.getId(), 0.35F);
+            }
+            return true;
+        }
         if (cooldown > 0) {
-            overlay(Component.translatable("hud.type95_addition.recharging", (cooldown + 19) / 20));
+            // (the Gauss Formula's second of recharge shows only as the bar under the ammo)
+            if (ClientConfig.ammo != ClientConfig.GAUSS) {
+                overlay(Component.translatable("hud.type95_addition.recharging", (cooldown + 19) / 20));
+            }
             return true;
         }
         if (!player.isCreative() && !survivalAllowed) {
@@ -73,8 +90,9 @@ public final class ChargeClient {
             return true;
         }
         charging = true;
+        gauss = ClientConfig.ammo == ClientConfig.GAUSS;
         held = 0;
-        ClientPlayNetworking.send(new ChargePayload(ChargePayload.START));
+        ClientPlayNetworking.send(new ChargePayload(gauss ? ChargePayload.GAUSS_START : ChargePayload.START));
         return true;
     }
 
@@ -92,19 +110,21 @@ public final class ChargeClient {
         if (!charging) {
             return;
         }
-        boolean keep = mc.screen == null && player.isAlive() && !player.isSpectator() && ClientConfig.lightning
+        boolean keep = mc.screen == null && player.isAlive() && !player.isSpectator() && ClientConfig.ammo == (gauss ? ClientConfig.GAUSS : ClientConfig.LIGHTNING)
             && Type95Addition.holdsRifle(player);
         if (!keep) {
             stop(ChargePayload.CANCEL);
         } else if (!mc.options.keyUse.isDown()) {
-            if (held < LightningCasting.MIN_HOLD) {
+            if (held < (gauss ? dev.type95addition.world.GaussShot.MIN_HOLD : LightningCasting.MIN_HOLD)) {
                 player.level().playLocalSound(player.getX(), player.getY(), player.getZ(), dev.type95addition.AddonSounds.FIZZLE,
                     SoundSource.PLAYERS, 0.8F, 1.0F, false);
             }
             stop(ChargePayload.RELEASE);
         } else {
             held++;
-            Marking.tick(mc);
+            if (!gauss) {
+                Marking.tick(mc);
+            }
         }
     }
 
@@ -127,11 +147,15 @@ public final class ChargeClient {
         if (charging) {
             stop(ChargePayload.CANCEL);
         }
-        ClientConfig.lightning = !ClientConfig.lightning;
+        ClientConfig.ammo = (ClientConfig.ammo + 1) % 4;
         ClientConfig.save();
         ammoShown = 60;
-        mc.getSoundManager().play(SimpleSoundInstance.forUI(
-            ClientConfig.lightning ? SoundEvents.BEACON_POWER_SELECT : SoundEvents.FLINTANDSTEEL_USE, ClientConfig.lightning ? 1.6F : 1.0F));
+        mc.getSoundManager().play(switch (ClientConfig.ammo) {
+            case ClientConfig.LIGHTNING -> SimpleSoundInstance.forUI(SoundEvents.BEACON_POWER_SELECT, 1.6F);
+            case ClientConfig.HOMING -> SimpleSoundInstance.forUI(SoundEvents.AMETHYST_BLOCK_RESONATE, 0.7F);
+            case ClientConfig.GAUSS -> SimpleSoundInstance.forUI(dev.type95addition.AddonSounds.GAUSS_STAGE, 0.8F);
+            default -> SimpleSoundInstance.forUI(SoundEvents.FLINTANDSTEEL_USE, 1.0F);
+        });
     }
 
     public static void sendTuning() {
@@ -148,6 +172,7 @@ public final class ChargeClient {
         serverFire = payload.fire();
         serverTerrain = payload.terrain();
         serverBlast = payload.blast();
+        serverGaussBlocks = payload.gaussBlocks();
         survivalAllowed = payload.survival();
         range = payload.range();
         sendTuning();
@@ -167,12 +192,18 @@ public final class ChargeClient {
         maxPower = LightningTuning.MAX_POWER;
         maxDamage = 0.0F;
         maxBolts = LightningTuning.MAX_BOLTS;
-        serverFire = serverTerrain = serverBlast = survivalAllowed = true;
+        serverFire = serverTerrain = serverBlast = serverGaussBlocks = survivalAllowed = true;
         ChargeFx.clear();
     }
 
+    /** A Lightning Formula charge is going on. */
     public static boolean charging() {
-        return charging;
+        return charging && !gauss;
+    }
+
+    /** Ticks the Gauss Formula has been charging, or -1. */
+    public static int gaussHeld() {
+        return charging && gauss ? held : -1;
     }
 
     public static int held() {
@@ -180,7 +211,7 @@ public final class ChargeClient {
     }
 
     public static float charge(float partial) {
-        return charging ? Mth.clamp((held + partial) / chargeTicks, 0.0F, 1.0F) : 0.0F;
+        return charging() ? Mth.clamp((held + partial) / chargeTicks, 0.0F, 1.0F) : 0.0F;
     }
 
     public static float cooldownLeft() {
@@ -200,7 +231,7 @@ public final class ChargeClient {
         if (ClientConfig.scope && (Scope.active() || Scope.fov(partial) < 0.999F)) {
             return Scope.fov(partial);
         }
-        if (!charging || !ClientConfig.zoom) {
+        if (!charging() || !ClientConfig.zoom) {
             return 1.0F;
         }
         float c = charge(partial);

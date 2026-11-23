@@ -1,6 +1,9 @@
 # CLAUDE.md
 
-**Type 95 Addition**: handoff notes for whoever (human or Claude) works on this next. Written 2026-10-23 (1.0.0), updated 2026-10-24 (1.1.0: the VFX/power/sound/animation overhaul).
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+**Type 95 Addition**: handoff notes for whoever (human or Claude) works on this next. Written 2026-10-23 (1.0.0), updated
+2026-10-24 (1.1.0, 1.2.0), 2026-10-30 (Forge 1.20.1 port, GitHub, Homing Formula) and 2026-11-23 (Gauss Formula).
 If the code disagrees with this file, the code wins.
 
 ## What this is
@@ -67,6 +70,64 @@ formula circle, rune dome, dust cloud). So 1.1.0:
 - A bit cooler: a formula circle in the sky over the strike and one burned into the ground (`Sigil` uniform), embers.
 - Harness: `-Dt95.clienttest.scope=true`, `-Dt95.clienttest.mark=true`.
 
+## 1.3.0 (2026-10-30): the Homing Formula
+
+The user asked for a third ammo: 10 homing bullets, the hit one crushed flat and killed ("crushed by a homing
+bullet"), red tint + magenta outline + vertical streaks (a Paper Mario screenshot), Infinite's (Sonic Forces) Phantom
+Ruby look, fliers grounded with special animations for bosses.
+
+- R now cycles Explosion -> Lightning -> Homing (`ClientConfig.ammo`, file key `ammo`; old `lightning_ammo` read once).
+  Right click fires at once (`ChargePayload.HOMING`), 30-tick cooldown, no J-screen settings.
+- `world/HomingShot`: targets = living things in a 35 degree cone in sight, nearest the crosshair first (no creative
+  players, no allies); bullets simulated on the server and, from `HomingPayload`, on each client (`launch`/`steer`/
+  `reaches` are shared). Hit -> `CrushPayload`: fliers slammed to the ground (12 ticks, bosses 30), held still
+  (setPos every tick, no NoAI: a mob unloaded mid-crush would be saved with it), pressed (30 / 50 ticks), flat at
+  `FLATTEN`, then `hurt` with damage type `homing_formula` (fallback `kill`, except a dragon already in DYING).
+  Boss = wither, dragon or 150+ max health.
+- `client/fx/HomingFx`: bullet trails with ruby cubes, streaks, the pressing cube, boss rings/chains, `t95_homing.fsh`
+  (red tint from the nearest crush only, halo, streaks, glitch bands). Squash: Fabric `EntityRendererMixin` (render
+  state data key + `outlineColor`) and `EntityRenderDispatcherMixin` (scale before the renderer's submit, so the
+  dragon too); Forge `EntityRenderDispatcherMixin` + `EntityMixin.getTeamColor` + `MinecraftMixin.shouldEntityAppearGlowing`.
+- Harness: `-Dt95.clienttest.homing=true` (pigs, a wither and a dragon in the cone; slimes are removed first).
+
+### The Gauss Formula (2026-11-23, still 1.3.0: nothing of 1.3.0 is released yet)
+
+The user's spec (a railgun round; named Gauss so it isn't confused with The Shooting Star's "Railgun" skill). They said
+the heat bar, ferrous-slug ammo, storm-charging, overcharge stage, bullet cam, science note and the heat/damage/block
+config are **theirs to do later: don't build them**.
+
+- R cycles Explosion -> Lightning -> Homing -> Gauss (`ClientConfig.GAUSS`, file key `gauss`). Hold right click:
+  3 stages of 20 ticks (`GaussShot.STAGE_TICKS`, full at 40); a tap under 3 ticks fizzles, any longer release fires
+  at the stage reached. 20-tick cooldown (bar under the ammo label only, no chat-line message).
+- Server: `ChargePayload.GAUSS_START` starts a charge in `LightningCasting`'s `CHARGING` map with the id in its
+  `GAUSS` set; `RELEASE` fires `GaussShot.fire`. Hitscan from the eye: `GaussShot.trace` (shared with the client)
+  walks `BlockGetter.traverseBlocks`; blocks softer than stone (explosion resistance < stone's, breakable) are gone
+  through, up to 12, if `LightningTuning.gaussBlocks` (J screen "Gauss: through blocks", server key `gauss_blocks`);
+  glass-sounding blocks and leaves are broken (`destroyBlock`, mobGriefing only). Mobs on the segment, nearest first,
+  2/4/6 by stage; the slug stops in the last. Damage 10-40 by charge, x0.85 per mob; 40% as `gauss_formula_pierce`
+  (in `#minecraft:bypasses_armor`), the rest as `gauss_formula`.
+- `GaussPayload` (muzzle, end, charge, block exits, hit points) goes to everyone within 192 of the muzzle, the middle
+  or the end. `ChargeSyncPayload` has a `gauss` flag so others see the right charge.
+- `client/fx/GaussFx`: coils (5, lit one by one per stage: blue, bright blue, white), whine (`ChargeSound` with
+  `gauss`), stage chime, aim line + rings at block exits + mobs in line outlined (`OUTLINE`; Fabric
+  `EntityRendererMixin`, Forge `EntityMixin`/`MinecraftMixin`), the shot (line of light 22 ticks, ionised spiral,
+  muzzle shock cone, sparks at exits/hits), crack at the muzzle, boom from the nearest point of the line delayed by
+  distance (`StrikeFx.later`). Sounds: `dev/art/make_gauss_sounds.py` (uses make_sounds.py's helpers).
+- **The coils are drawn with the rifle, not as world particles.** First person: the hand is drawn over the world,
+  so world particles on the barrel are hidden; `ItemInHandRendererMixin` calls `GaussFx.handCoils` (view space, the
+  same barrel line as `ChargeFx.gun`). Third person: `ItemInHandLayerMixin` calls `GaussFx.heldCoils` in the held
+  item's space. Type 95 draws its rifle with code (a special model, no geometry file), so `HELD_MUZZLE`/`HELD_AXIS`
+  were measured: the harness's stand-in (a client-side `RemotePlayer` holding the rifle, charged) was shot from its
+  side, front and back with the held pose matrix logged, and a line was fitted so it projects onto the barrel in all
+  three. If Type 95 changes its model, redo that (log `pose.last().pose()` in `heldCoils`, fit offline).
+- HUD: the Gauss charge bar and label sit left of the crosshair (the aimed rifle's muzzle is just below it). The J
+  screen (now titled "Type 95 Addition") got the Gauss toggle as a 9th row; its rows shrink from 24 to 21 px so it
+  fits a 240-px-high GUI.
+- Harness: `-Dt95.clienttest.gauss=true`: stand-in shots (`t95_gauss0_standin_*`), then a glass wall, planks, wool,
+  leaves, 4 pigs, a diamond-armoured zombie, stone and a pig behind it in one line; a stage-1 tap (2 pigs die), then
+  a full shot (2 pigs + the zombie hit, it stops at the stone), a side view of the line, and the J screen. Logs who
+  is left and which blocks are gone.
+
 ## Forge 1.20.1 build (`forge-1.20.1/`, 2026-10-30)
 
 A separate Gradle project (ModDevGradle legacy, Forge 47.4.10, Java 17, parchment), set up like The Shooting Star
@@ -108,13 +169,14 @@ it. Type 95's HUD still shows its own bits while the rifle is held; that is fine
   join), `ChargeSyncPayload` (S2C who is charging, for other players' effects), `StrikePayload` (S2C beam),
   `BoltPayload` (S2C each bolt), `CooldownPayload`.
 - `world/`: server. Strike timeline: tick 0 beam, tick 3 (`MAIN`) main bolt + area damage + blast + scorch start,
-  then a bolt every 2 ticks. Scorch does 240 columns/tick, nearest first, only with mobGriefing on.
+  then a bolt every 2 ticks. Scorch does 500 columns/tick, nearest first, only with mobGriefing on.
 - `client/`: `ChargeClient` (local state, keys), `AdditionHud`, `LightningScreen`, `ClientConfig`, `Palette`;
   `client/fx/`: `ArcParticle` (full-bright dot, the only particle type: `type95_addition:arc`), `Arcs` (jagged
   arcs/rings out of dots), `ChargeFx` (the 4 stages + sounds), `ChargeSound` (hum), `StrikeFx` (beam, sky bolts in
-  the palette colour over the vanilla ones, shock ring, ground arcs, flash, shake). Mixins: `MinecraftMixin`,
-  `AbstractClientPlayerMixin` (zoom), `CameraMixin` (shake).
-- Sounds are all vanilla (beacon hum, lightning impact/thunder, trident thunder); no custom audio yet.
+  the palette colour over the vanilla ones, shock ring, ground arcs, flash, shake), `MarkFx`, `StormFx` (Rimulib
+  post-processing). Fabric mixins: `MinecraftMixin` (right/left click), `AbstractClientPlayerMixin` (zoom),
+  `CameraMixin` (shake), `MouseHandlerMixin` (scope scroll), `ItemInHandRendererMixin`, `PlayerModelMixin`.
+- Sounds: the addon's own 18 oggs (`AddonSounds`, `sounds.json`) plus some vanilla ones.
 
 ## Building and testing
 
@@ -128,6 +190,18 @@ it. Type 95's HUD still shows its own bits while the rifle is held; that is fine
   screenshots to `run/clienttest/screenshots/t95_*.png`, logs `[T95TEST]` lines (pigs left, blocks scorched) and quits.
   `run/clienttest/options.txt` needs `onboardAccessibility:false` or it stalls on the first-launch screen.
 
+## Repo and releases
+
+- GitHub `Adamko-10/Type-95-Sniper-Rifle-Addition`, branch `main` (both builds in one branch). Commit as the user's own
+  git identity. Push and release only when the user asks.
+- Releases: one per loader, tag `v<ver>` (Fabric 1.21.11) and `v<ver>+forge-1.20.1`, titled
+  `Type 95 Addition <ver> [<Loader> <MC>]`, the jar attached, a short changelog for players. Local test jars live in
+  `releases/<ver> (to test)/` (git-ignored). `gh release create` treats `[...]` in a file name as a glob, and the
+  Windows `gh.exe` can't read `/c/...` paths: upload a copy with a plain name from a relative path, label it with
+  `file#Proper name`.
+- `.gitignore` must keep `libs/**/*.jar` and `forge-1.20.1/libs/**/*.jar` (Type 95's and Rimulib's jars are All Rights
+  Reserved; `libs/*.jar` alone missed `libs/dev/`). Check `git diff --cached --name-only | grep jar` before committing.
+
 ## Pitfalls already paid for
 
 - Never ask for a key's name (`KeyMapping.getTranslatedKeyMessage()`) during mod init: it calls GLFW before the game
@@ -137,4 +211,7 @@ it. Type 95's HUD still shows its own bits while the rifle is held; that is fine
 - Shader light terms need squared falloff and modest gains: `lightFalloff` has a long tail, and 2-4x gains washed
   the whole screen white. Rimulib's bloom only picks up what a pass *adds* (plus a `synthetic` knee), keep
   `synthetic` low (0.15-0.25) or the daytime sky blooms.
+- In first person the rifle is drawn after the world with the depth cleared: anything meant to sit *on* the rifle
+  must be drawn in the hand pass (`ItemInHandRendererMixin`), not as particles. In third person draw it in the held
+  item's space (`ItemInHandLayerMixin`); `ChargeFx.gun`'s third-person muzzle is only a rough guess.
 - Darkening Minecraft's own clouds to near-black makes ugly black blocks: tint them instead.

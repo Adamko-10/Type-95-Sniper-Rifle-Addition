@@ -50,6 +50,9 @@ public final class AddonNetwork {
         toClient(StrikePayload.class, StrikePayload::write, StrikePayload::read);
         toClient(BoltPayload.class, BoltPayload::write, BoltPayload::read);
         toClient(CooldownPayload.class, CooldownPayload::write, CooldownPayload::read);
+        toClient(HomingPayload.class, HomingPayload::write, HomingPayload::read);
+        toClient(CrushPayload.class, CrushPayload::write, CrushPayload::read);
+        toClient(GaussPayload.class, GaussPayload::write, GaussPayload::read);
     }
 
     private static <T> void toServer(Class<T> type, BiConsumer<T, FriendlyByteBuf> write, Function<FriendlyByteBuf, T> read,
@@ -94,7 +97,7 @@ public final class AddonNetwork {
     public static void sendSettings(ServerPlayer player) {
         send(player, new SettingsPayload(ServerConfig.chargeTicks(), ServerConfig.maxPower(), ServerConfig.maxDamage(),
             ServerConfig.maxBolts(), ServerConfig.fire(), ServerConfig.terrain(), ServerConfig.blast(), ServerConfig.survival(),
-            (float)ServerConfig.range()));
+            (float)ServerConfig.range(), ServerConfig.gaussBlocks()));
     }
 
     public static void send(ServerPlayer player, Object payload) {

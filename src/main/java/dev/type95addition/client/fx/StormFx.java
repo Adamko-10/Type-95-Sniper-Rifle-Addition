@@ -50,6 +50,8 @@ public final class StormFx {
         ChargeFx.passes(camera, partial, passes, SCREEN);
         StrikeFx.passes(camera, partial, passes, SCREEN);
         MarkFx.passes(camera, partial, passes, SCREEN);
+        HomingFx.passes(camera, partial, passes, SCREEN);
+        GaussFx.passes(camera, partial, SCREEN);
         if (passes.isEmpty() && SCREEN.idle()) {
             return;
         }

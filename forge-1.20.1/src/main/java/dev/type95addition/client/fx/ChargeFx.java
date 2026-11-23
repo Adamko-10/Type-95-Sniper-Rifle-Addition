@@ -58,11 +58,12 @@ public final class ChargeFx {
             }
             return;
         }
-        if (payload.charging()) {
+        if (payload.charging() && !payload.gauss()) {
             REMOTE.put(payload.entityId(), ticks - payload.heldTicks());
         } else {
             REMOTE.remove(payload.entityId());
         }
+        GaussFx.sync(payload.entityId(), payload.charging() && payload.gauss(), payload.heldTicks());
     }
 
     public static void clear() {

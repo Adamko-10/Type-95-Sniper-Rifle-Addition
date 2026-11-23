@@ -10,8 +10,10 @@ import dev.type95addition.net.ChargeSyncPayload;
 import dev.type95addition.net.CooldownPayload;
 import dev.type95addition.net.MarkPayload;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -41,6 +43,8 @@ public final class LightningCasting {
     public static final int MIN_HOLD = 8;
 
     private static final Map<UUID, Long> CHARGING = new HashMap<>();
+    /** The charges in {@link #CHARGING} that are the Gauss Formula's (the rest are lightning). */
+    private static final Set<UUID> GAUSS = new HashSet<>();
     private static final Map<UUID, LightningTuning> TUNINGS = new HashMap<>();
     private static final Map<UUID, Long> COOLDOWN_UNTIL = new HashMap<>();
     /** Where each charging player has marked the strike to land (left click while charging). */
@@ -74,32 +78,54 @@ public final class LightningCasting {
         UUID id = player.getUUID();
         long now = player.level().getGameTime();
         switch (action) {
-            case ChargePayload.START -> {
+            case ChargePayload.START, ChargePayload.GAUSS_START -> {
                 if (!canFire(player)) {
                     stopped(player);
                     return;
                 }
+                boolean gauss = action == ChargePayload.GAUSS_START;
                 CHARGING.put(id, now);
-                AddonNetwork.sendAround(player, new ChargeSyncPayload(player.getId(), true, 0));
+                if (gauss) {
+                    GAUSS.add(id);
+                } else {
+                    GAUSS.remove(id);
+                }
+                AddonNetwork.sendAround(player, new ChargeSyncPayload(player.getId(), true, 0, gauss));
             }
             case ChargePayload.RELEASE -> {
                 Long start = CHARGING.remove(id);
                 MarkPayload mark = MARKS.remove(id);
+                boolean gauss = GAUSS.remove(id);
                 if (start == null) {
                     return;
                 }
                 stopped(player);
                 int held = (int)(now - start);
-                if (held < MIN_HOLD) {
-                    tell(player, Component.translatable("hud.type95_addition.too_short"));
+                if (held < (gauss ? GaussShot.MIN_HOLD : MIN_HOLD)) {
+                    if (!gauss) {
+                        tell(player, Component.translatable("hud.type95_addition.too_short"));
+                    }
                     return;
                 }
-                if (canFire(player)) {
+                if (!canFire(player)) {
+                    return;
+                }
+                if (gauss) {
+                    GaussShot.fire(player, held, tuning(player).gaussBlocks());
+                    cooldown(player, GaussShot.COOLDOWN);
+                } else {
                     fire(player, held, mark);
+                }
+            }
+            case ChargePayload.HOMING -> {
+                if (!CHARGING.containsKey(id) && canFire(player)) {
+                    HomingShot.fire(player);
+                    cooldown(player, HomingShot.COOLDOWN);
                 }
             }
             case ChargePayload.CANCEL -> {
                 MARKS.remove(id);
+                GAUSS.remove(id);
                 if (CHARGING.remove(id) != null) {
                     stopped(player);
                 }
@@ -118,6 +144,7 @@ public final class LightningCasting {
                 it.remove();
             } else if (!player.isAlive() || player.isSpectator() || !Type95Addition.holdsRifle(player)) {
                 it.remove();
+                GAUSS.remove(player.getUUID());
                 MARKS.remove(player.getUUID());
                 stopped(player);
             }
@@ -126,12 +153,14 @@ public final class LightningCasting {
 
     public static void forget(ServerPlayer player) {
         CHARGING.remove(player.getUUID());
+        GAUSS.remove(player.getUUID());
         TUNINGS.remove(player.getUUID());
         MARKS.remove(player.getUUID());
     }
 
     public static void clear() {
         CHARGING.clear();
+        GAUSS.clear();
         TUNINGS.clear();
         COOLDOWN_UNTIL.clear();
         MARKS.clear();
@@ -158,7 +187,7 @@ public final class LightningCasting {
     }
 
     private static void stopped(ServerPlayer player) {
-        AddonNetwork.sendAround(player, new ChargeSyncPayload(player.getId(), false, 0));
+        AddonNetwork.sendAround(player, new ChargeSyncPayload(player.getId(), false, 0, false));
     }
 
     private static void tell(ServerPlayer player, Component message) {
@@ -172,9 +201,7 @@ public final class LightningCasting {
 
         Vec3 eye = player.getEyePosition();
         Vec3 look = player.getLookAngle();
-        Vec3 right = look.cross(new Vec3(0.0, 1.0, 0.0));
-        right = right.lengthSqr() < 1.0E-6 ? new Vec3(1.0, 0.0, 0.0) : right.normalize();
-        Vec3 muzzle = eye.add(look.scale(1.2)).add(right.scale(0.22)).add(0.0, -0.12, 0.0);
+        Vec3 muzzle = muzzle(player);
 
         double reach = loadedReach(level, eye, look, ServerConfig.range());
         Vec3 end = eye.add(look.scale(reach));
@@ -201,9 +228,7 @@ public final class LightningCasting {
 
         LightningStrike.start(new LightningStrike(level, player, muzzle, target, charge, tuning));
 
-        int total = ServerConfig.cooldownTicks(player.isCreative());
-        COOLDOWN_UNTIL.put(player.getUUID(), level.getGameTime() + total);
-        AddonNetwork.send(player, new CooldownPayload(total, total));
+        cooldown(player, ServerConfig.cooldownTicks(player.isCreative()));
 
         level.playSound(null, muzzle.x, muzzle.y, muzzle.z, AddonSounds.FIRE, SoundSource.PLAYERS, 2.0F + 2.0F * charge,
             1.15F - 0.25F * charge);
@@ -212,6 +237,19 @@ public final class LightningCasting {
         recoil(player, look, charge);
         Type95Addition.LOGGER.info("Lightning Formula fired by {}: charge {} power {} damage {} bolts {} at {}",
             player.getName().getString(), charge, tuning.power(), tuning.damage(), tuning.bolts(), target);
+    }
+
+    private static void cooldown(ServerPlayer player, int total) {
+        COOLDOWN_UNTIL.put(player.getUUID(), player.level().getGameTime() + total);
+        AddonNetwork.send(player, new CooldownPayload(total, total));
+    }
+
+    /** Where shots leave the rifle: in front of the eye, a little right and down. */
+    static Vec3 muzzle(ServerPlayer player) {
+        Vec3 look = player.getLookAngle();
+        Vec3 right = look.cross(new Vec3(0.0, 1.0, 0.0));
+        right = right.lengthSqr() < 1.0E-6 ? new Vec3(1.0, 0.0, 0.0) : right.normalize();
+        return player.getEyePosition().add(look.scale(1.2)).add(right.scale(0.22)).add(0.0, -0.12, 0.0);
     }
 
     /** Where a mark puts the strike: on the marked mob (if it's still alive and here), the block, or under the sky point. */
@@ -230,7 +268,7 @@ public final class LightningCasting {
         return mark.pos();
     }
 
-    private static void recoil(ServerPlayer player, Vec3 look, float charge) {
+    static void recoil(ServerPlayer player, Vec3 look, float charge) {
         if (player.isPassenger() || player.getAbilities().flying) {
             return;
         }
@@ -240,7 +278,7 @@ public final class LightningCasting {
     }
 
     /** How far along the look the world is loaded (the strike never lands in unloaded chunks). */
-    private static double loadedReach(ServerLevel level, Vec3 from, Vec3 dir, double max) {
+    static double loadedReach(ServerLevel level, Vec3 from, Vec3 dir, double max) {
         for (double d = 0.0; d <= max; d += 8.0) {
             Vec3 p = from.add(dir.scale(d));
             if (level.getChunkSource().getChunkNow(SectionPos.blockToSectionCoord(p.x), SectionPos.blockToSectionCoord(p.z)) == null) {

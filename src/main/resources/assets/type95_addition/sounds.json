@@ -99,5 +99,32 @@
       "type95_addition:scope"
     ],
     "subtitle": "subtitles.type95_addition.scope"
+  },
+  "gauss_whine": {
+    "sounds": [
+      {
+        "name": "type95_addition:gauss_whine",
+        "stream": false
+      }
+    ],
+    "subtitle": "subtitles.type95_addition.gauss_whine"
+  },
+  "gauss_stage": {
+    "sounds": [
+      "type95_addition:gauss_stage"
+    ],
+    "subtitle": "subtitles.type95_addition.gauss_stage"
+  },
+  "gauss_crack": {
+    "sounds": [
+      "type95_addition:gauss_crack"
+    ],
+    "subtitle": "subtitles.type95_addition.gauss_crack"
+  },
+  "gauss_boom": {
+    "sounds": [
+      "type95_addition:gauss_boom"
+    ],
+    "subtitle": "subtitles.type95_addition.gauss_boom"
   }
 }

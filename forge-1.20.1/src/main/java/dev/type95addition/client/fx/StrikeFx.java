@@ -131,18 +131,23 @@ public final class StrikeFx {
             Object[] s = it.next();
             if ((int)s[0] <= ticks) {
                 Vec3 at = (Vec3)s[1];
-                level.playLocalSound(at.x, at.y, at.z, (SoundEvent)s[2], SoundSource.WEATHER, (float)s[3], (float)s[4], false);
+                level.playLocalSound(at.x, at.y, at.z, (SoundEvent)s[2], (SoundSource)s[5], (float)s[3], (float)s[4], false);
                 it.remove();
             }
         }
     }
 
-    /** Plays a sound at {@code at} when its sound would reach the listener. */
+    /** Thunder, heard when it would reach the listener. */
     private static void thunder(Vec3 at, SoundEvent sound, float volume, float pitch) {
+        later(at, sound, SoundSource.WEATHER, volume, pitch);
+    }
+
+    /** Plays a sound at {@code at} when its sound would reach the listener. */
+    static void later(Vec3 at, SoundEvent sound, SoundSource source, float volume, float pitch) {
         Minecraft mc = Minecraft.getInstance();
         double d = mc.player == null ? 0.0 : mc.player.position().distanceTo(at);
         int delay = (int)(d / SOUND_SPEED);
-        DELAYED_SOUNDS.add(new Object[] {ticks + delay, at, sound, volume, pitch});
+        DELAYED_SOUNDS.add(new Object[] {ticks + delay, at, sound, volume, pitch, source});
     }
 
     /** A loose flash of light on the land (the charge's little bolts). */
@@ -495,6 +500,13 @@ public final class StrikeFx {
             pts[i * 4 + 1] = (float)(b[1] - camera.y);
             pts[i * 4 + 2] = (float)(b[2] - camera.z);
             pts[i * 4 + 3] = (float)b[3];
+        }
+    }
+
+    /** A shake from something else (the Homing Formula's crushes); the J screen's switch still applies. */
+    public static void addShake(float amount) {
+        if (ClientConfig.shake) {
+            shake = Math.max(shake, amount);
         }
     }
 

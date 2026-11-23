@@ -7,10 +7,11 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 /**
  * Server to client, on joining: the part of the server's config the client needs (the charge time, for the charge's
- * stages, and the limits the J screen shows). {@code survival}: survival players may fire the Lightning Formula.
+ * stages, and the limits the J screen shows). {@code survival}: survival players may fire the Lightning Formula;
+ * {@code gaussBlocks}: the Gauss Formula may go through blocks.
  */
 public record SettingsPayload(int chargeTicks, float maxPower, float maxDamage, int maxBolts, boolean fire, boolean terrain,
-                              boolean blast, boolean survival, float range) implements CustomPacketPayload {
+                              boolean blast, boolean survival, float range, boolean gaussBlocks) implements CustomPacketPayload {
     public static final Type<SettingsPayload> TYPE = new Type<>(Type95Addition.id("settings"));
     public static final StreamCodec<FriendlyByteBuf, SettingsPayload> CODEC = CustomPacketPayload.codec(
         SettingsPayload::write, SettingsPayload::read);
@@ -20,7 +21,7 @@ public record SettingsPayload(int chargeTicks, float maxPower, float maxDamage, 
         buf.writeFloat(this.maxPower);
         buf.writeFloat(this.maxDamage);
         buf.writeVarInt(this.maxBolts);
-        buf.writeByte((this.fire ? 1 : 0) | (this.terrain ? 2 : 0) | (this.blast ? 4 : 0) | (this.survival ? 8 : 0));
+        buf.writeByte((this.fire ? 1 : 0) | (this.terrain ? 2 : 0) | (this.blast ? 4 : 0) | (this.survival ? 8 : 0) | (this.gaussBlocks ? 16 : 0));
         buf.writeFloat(this.range);
     }
 
@@ -32,7 +33,7 @@ public record SettingsPayload(int chargeTicks, float maxPower, float maxDamage, 
         int flags = buf.readByte();
         float range = buf.readFloat();
         return new SettingsPayload(chargeTicks, maxPower, maxDamage, maxBolts, (flags & 1) != 0, (flags & 2) != 0,
-            (flags & 4) != 0, (flags & 8) != 0, range);
+            (flags & 4) != 0, (flags & 8) != 0, range, (flags & 16) != 0);
     }
 
     @Override

@@ -18,7 +18,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * First person: while charging, the rifle comes in towards the centre of the view and starts to shake (harder as
- * the charge grows, pulsing at full charge); each shot kicks it back into the shoulder and up, springing back.
+ * the charge grows, pulsing at full charge); each shot kicks it back into the shoulder and up, springing back. The
+ * Gauss Formula's coils are drawn here too, with the rifle.
  */
 @Mixin(ItemInHandRenderer.class)
 abstract class ItemInHandRendererMixin {
@@ -56,6 +57,9 @@ abstract class ItemInHandRendererMixin {
     private void type95addition$restore(AbstractClientPlayer player, float partial, float pitch, InteractionHand hand, float swing,
                                          ItemStack stack, float equip, PoseStack pose, MultiBufferSource buffers, int light,
                                          CallbackInfo ci) {
+        if (hand == InteractionHand.MAIN_HAND && Type95Addition.isRifle(stack)) {
+            dev.type95addition.client.fx.GaussFx.handCoils(pose, buffers, player.getId());
+        }
         if (this.type95addition$moved) {
             this.type95addition$moved = false;
             pose.popPose();

@@ -3,6 +3,7 @@ package dev.type95addition;
 import cyou.rimuru.rimulib.mc1201.Rimulib;
 import dev.type95addition.client.AdditionClient;
 import dev.type95addition.net.AddonNetwork;
+import dev.type95addition.world.HomingShot;
 import dev.type95addition.world.LightningCasting;
 import dev.type95addition.world.LightningStrike;
 import java.util.Comparator;
@@ -48,6 +49,7 @@ public final class Type95Addition {
     public static final ResourceLocation RIFLE = new ResourceLocation("tanya_demo", "type95_rifle");
 
     public static final ResourceKey<DamageType> LIGHTNING_FORMULA = ResourceKey.create(Registries.DAMAGE_TYPE, id("lightning_formula"));
+    public static final ResourceKey<DamageType> HOMING_FORMULA = ResourceKey.create(Registries.DAMAGE_TYPE, id("homing_formula"));
 
     /** The arcs of every charge and strike (drawn by {@code client.fx.ArcParticle}; spawned on the client only). */
     public static final SimpleParticleType ARC = new SimpleParticleType(true);
@@ -67,12 +69,14 @@ public final class Type95Addition {
             if (event.phase == TickEvent.Phase.END) {
                 LightningCasting.tick(event.getServer());
                 LightningStrike.tickAll();
+                HomingShot.tickAll();
             }
         });
         MinecraftForge.EVENT_BUS.addListener((ServerStartingEvent event) -> ServerConfig.load());
         MinecraftForge.EVENT_BUS.addListener((ServerStoppingEvent event) -> {
             LightningCasting.clear();
             LightningStrike.clear();
+            HomingShot.clear();
         });
         MinecraftForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedInEvent event) -> {
             if (event.getEntity() instanceof ServerPlayer player) {

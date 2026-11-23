@@ -8,17 +8,23 @@ import net.minecraft.world.entity.player.Player;
 
 /**
  * A charge's looping sound, following the player: the hum (rising in pitch and volume with the charge), or with
- * {@code fullLayer} the roar that joins it at full charge.
+ * {@code fullLayer} the roar that joins it at full charge; with {@code gauss} the Gauss Formula's capacitor whine.
  */
 final class ChargeSound extends AbstractTickableSoundInstance {
     private final Player player;
     private final boolean fullLayer;
+    private final boolean gauss;
     private int age;
 
     ChargeSound(Player player, SoundEvent sound, boolean fullLayer) {
+        this(player, sound, fullLayer, false);
+    }
+
+    ChargeSound(Player player, SoundEvent sound, boolean fullLayer, boolean gauss) {
         super(sound, SoundSource.PLAYERS, SoundInstance.createUnseededRandom());
         this.player = player;
         this.fullLayer = fullLayer;
+        this.gauss = gauss;
         this.looping = true;
         this.delay = 0;
         this.volume = 0.01F;
@@ -30,14 +36,18 @@ final class ChargeSound extends AbstractTickableSoundInstance {
 
     @Override
     public void tick() {
-        int held = ChargeFx.held(this.player.getId());
+        int held = this.gauss ? GaussFx.held(this.player.getId()) : ChargeFx.held(this.player.getId());
         if (held < 0 || this.player.isRemoved()) {
             this.stop();
             return;
         }
         this.age++;
-        float c = ChargeFx.charge(held);
-        if (this.fullLayer) {
+        float c = this.gauss ? dev.type95addition.world.GaussShot.charge(held) : ChargeFx.charge(held);
+        if (this.gauss) {
+            // the capacitors whine up an octave and a half over the charge
+            this.volume = Math.min(1.0F, this.age / 4.0F) * (0.35F + 0.4F * c);
+            this.pitch = 0.55F + 1.2F * c;
+        } else if (this.fullLayer) {
             this.volume = Math.min(1.0F, this.age / 10.0F) * 0.9F;
             this.pitch = 0.95F + 0.05F * (float)Math.sin(this.age * 0.2);
         } else {

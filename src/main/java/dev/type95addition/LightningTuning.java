@@ -14,8 +14,9 @@ import net.minecraft.util.Mth;
  * @param fire   bolts set fires (and a real vanilla bolt comes down first: charged creepers, witches...)
  * @param terrain the ground is scorched: Lichtenberg scars of glass, magma and blackstone (needs mobGriefing)
  * @param blast  from stage 3 the strike blasts a crater (glass, magma and blackstone) out of the ground
+ * @param gaussBlocks the Gauss Formula's slug goes through blocks softer than stone
  */
-public record LightningTuning(float power, float damage, int bolts, boolean fire, boolean terrain, boolean blast) {
+public record LightningTuning(float power, float damage, int bolts, boolean fire, boolean terrain, boolean blast, boolean gaussBlocks) {
     public static final float MIN_POWER = 0.1F;
     public static final float MAX_POWER = 20.0F;
     public static final float MIN_DAMAGE = 2.0F;
@@ -24,7 +25,7 @@ public record LightningTuning(float power, float damage, int bolts, boolean fire
     public static final int MIN_BOLTS = 1;
     public static final int MAX_BOLTS = 16;
 
-    public static final LightningTuning DEFAULT = new LightningTuning(1.0F, 24.0F, 6, true, true, true);
+    public static final LightningTuning DEFAULT = new LightningTuning(1.0F, 24.0F, 6, true, true, true, true);
 
     public boolean erases() {
         return this.damage == INFINITE;
@@ -42,14 +43,15 @@ public record LightningTuning(float power, float damage, int bolts, boolean fire
         return new LightningTuning(p, d, b,
             this.fire && ServerConfig.fire(),
             this.terrain && ServerConfig.terrain(),
-            this.blast && ServerConfig.blast());
+            this.blast && ServerConfig.blast(),
+            this.gaussBlocks && ServerConfig.gaussBlocks());
     }
 
     public void write(FriendlyByteBuf buf) {
         buf.writeFloat(this.power);
         buf.writeFloat(this.damage);
         buf.writeVarInt(this.bolts);
-        buf.writeByte((this.fire ? 1 : 0) | (this.terrain ? 2 : 0) | (this.blast ? 4 : 0));
+        buf.writeByte((this.fire ? 1 : 0) | (this.terrain ? 2 : 0) | (this.blast ? 4 : 0) | (this.gaussBlocks ? 8 : 0));
     }
 
     public static LightningTuning read(FriendlyByteBuf buf) {
@@ -57,7 +59,7 @@ public record LightningTuning(float power, float damage, int bolts, boolean fire
         float damage = buf.readFloat();
         int bolts = buf.readVarInt();
         int flags = buf.readByte();
-        return new LightningTuning(power, damage, bolts, (flags & 1) != 0, (flags & 2) != 0, (flags & 4) != 0);
+        return new LightningTuning(power, damage, bolts, (flags & 1) != 0, (flags & 2) != 0, (flags & 4) != 0, (flags & 8) != 0);
     }
 
     // ---- The strike's numbers ------------------------------------------------------------------------------------

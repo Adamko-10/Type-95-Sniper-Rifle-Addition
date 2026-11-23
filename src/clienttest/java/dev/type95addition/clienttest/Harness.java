@@ -93,7 +93,7 @@ public final class Harness implements ClientModInitializer {
             case 2 -> {
                 if (++wait > 40) {
                     log("charging; charge time " + ChargeClient.chargeTicks + " ticks");
-                    step = OG ? 10 : 3;
+                    step = OG ? 10 : HOMING ? 20 : GAUSS ? 30 : 3;
                     wait = 0;
                 }
             }
@@ -101,6 +101,8 @@ public final class Harness implements ClientModInitializer {
             case 10 -> ogCharge(mc);
             case 11 -> ogAfter(mc);
             case 4 -> afterShot(mc);
+            case 20 -> homing(mc);
+            case 30 -> gauss(mc);
             default -> {
             }
         }
@@ -126,7 +128,7 @@ public final class Harness implements ClientModInitializer {
     }
 
     private static void setUp(Minecraft mc) {
-        ClientConfig.lightning = !OG;
+        ClientConfig.ammo = OG ? ClientConfig.EXPLOSION : HOMING ? ClientConfig.HOMING : GAUSS ? ClientConfig.GAUSS : ClientConfig.LIGHTNING;
         String palette = System.getProperty("t95.clienttest.palette");
         if (palette != null) {
             ClientConfig.palette = Palette.byKey(palette);
@@ -154,8 +156,20 @@ public final class Harness implements ClientModInitializer {
             var rifle = BuiltInRegistries.ITEM.getValue(Type95Addition.RIFLE);
             player.getInventory().setItem(0, new ItemStack(rifle));
             log("rifle item " + BuiltInRegistries.ITEM.getKey(rifle) + ", ground y " + ground);
+            if (GAUSS) {
+                gaussRange(server, level);
+                return;
+            }
             for (int i = 0; i < 8; i++) {
-                EntityType.PIG.spawn(level, new BlockPos(-4 + i, ground, TARGET_DIST + (i % 3) - 1), EntitySpawnReason.COMMAND);
+                var pig = EntityType.PIG.spawn(level, new BlockPos(-4 + i, ground, TARGET_DIST + (i % 3) - 1), EntitySpawnReason.COMMAND);
+                if (i == 0 && pig != null) {
+                    pig.setCustomName(net.minecraft.network.chat.Component.literal("Bob"));
+                }
+            }
+            if (HOMING) {
+                server.setDifficulty(Difficulty.NORMAL, true);
+                EntityType.WITHER.spawn(level, new BlockPos(6, ground + 10, 34), EntitySpawnReason.COMMAND);
+                EntityType.ENDER_DRAGON.spawn(level, new BlockPos(0, ground + 20, 44), EntitySpawnReason.COMMAND);
             }
             burntBefore = countBurnt(level);
             if (MARK) {
@@ -274,6 +288,229 @@ public final class Harness implements ClientModInitializer {
             log("done");
             mc.stop();
         }
+    }
+
+    // ---- The Homing Formula (-Dt95.clienttest.homing=true): one shot at the pigs, a wither and a dragon --------------
+
+    private static final boolean HOMING = Boolean.getBoolean("t95.clienttest.homing");
+
+    private static void homing(Minecraft mc) {
+        holdAim(mc);
+        after++;
+        if (after == 1) {
+            // superflat's slimes would take bullets meant for the bosses
+            IntegratedServer server = mc.getSingleplayerServer();
+            server.execute(() -> server.overworld().getEntitiesOfClass(net.minecraft.world.entity.monster.Slime.class,
+                new AABB(-200, -100, -200, 200, 100, 300)).forEach(net.minecraft.world.entity.Entity::discard));
+        }
+        mc.options.keyUse.setDown(after >= 3 && after <= 4);
+        for (int t : new int[] {4, 10, 18, 26, 36, 48, 60, 75, 90, 100, 115, 140}) {
+            if (after == t) {
+                shot(mc, "homing_" + t);
+            }
+        }
+        if (after == 60) {
+            mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+        }
+        if (after == 160) {
+            IntegratedServer server = mc.getSingleplayerServer();
+            server.execute(() -> {
+                ServerLevel level = server.overworld();
+                AABB box = new AABB(-60, ground - 10, -10, 60, ground + 60, 90);
+                log("pigs alive after the homing shot: " + level.getEntitiesOfClass(Animal.class, box).size() + " of 8");
+                log("withers alive: " + level.getEntitiesOfClass(net.minecraft.world.entity.boss.wither.WitherBoss.class, box).size());
+                for (var dragon : level.getEntitiesOfClass(net.minecraft.world.entity.boss.enderdragon.EnderDragon.class, box.inflate(100))) {
+                    log("dragon: " + dragon.getPhaseManager().getCurrentPhase().getPhase() + " at " + dragon.position() + ", " + dragon.getHealth() + " hp");
+                }
+            });
+        }
+        if (after == 170) {
+            log("done");
+            mc.stop();
+        }
+    }
+
+    // ---- The Gauss Formula (-Dt95.clienttest.gauss=true): a tap shot, then a full one, down a line of targets ---------
+
+    private static final boolean GAUSS = Boolean.getBoolean("t95.clienttest.gauss");
+    /** The line's slope: from eye height at the player down through the pigs' middles 20-30 blocks off. */
+    private static final double GAUSS_SLOPE = 0.039;
+    private static final int[] GAUSS_PIGS = {20, 23, 26, 29};
+    private static final int GAUSS_ZOMBIE = 32;
+    private static final int GAUSS_STONE = 35;
+    private static final int GAUSS_BEHIND = 38;
+    private static int gaussShot;
+
+    private static void gaussRange(IntegratedServer server, ServerLevel level) {
+        server.setDifficulty(Difficulty.NORMAL, true);
+        for (int x = -3; x <= 3; x++) {
+            for (int y = 0; y < 3; y++) {
+                level.setBlockAndUpdate(new BlockPos(x, ground + y, 12), Blocks.GLASS.defaultBlockState());
+            }
+        }
+        level.setBlockAndUpdate(new BlockPos(0, ground + 1, 14), Blocks.OAK_PLANKS.defaultBlockState());
+        level.setBlockAndUpdate(new BlockPos(0, ground + 1, 16), Blocks.WHITE_WOOL.defaultBlockState());
+        level.setBlockAndUpdate(new BlockPos(0, ground, 18), Blocks.OAK_LEAVES.defaultBlockState()
+            .setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true));
+        level.setBlockAndUpdate(new BlockPos(0, ground, GAUSS_STONE), Blocks.STONE.defaultBlockState());
+        for (int z : GAUSS_PIGS) {
+            gaussTarget(level, EntityType.PIG, z);
+        }
+        var zombie = gaussTarget(level, EntityType.ZOMBIE, GAUSS_ZOMBIE);
+        if (zombie != null) {
+            zombie.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(net.minecraft.world.item.Items.DIAMOND_HELMET));
+            zombie.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, new ItemStack(net.minecraft.world.item.Items.DIAMOND_CHESTPLATE));
+            zombie.setItemSlot(net.minecraft.world.entity.EquipmentSlot.LEGS, new ItemStack(net.minecraft.world.item.Items.DIAMOND_LEGGINGS));
+            zombie.setItemSlot(net.minecraft.world.entity.EquipmentSlot.FEET, new ItemStack(net.minecraft.world.item.Items.DIAMOND_BOOTS));
+            log("zombie armour " + zombie.getArmorValue());
+        }
+        gaussTarget(level, EntityType.PIG, GAUSS_BEHIND);
+    }
+
+    private static net.minecraft.world.entity.Mob gaussTarget(ServerLevel level, EntityType<? extends net.minecraft.world.entity.Mob> type, int z) {
+        var mob = type.spawn(level, new BlockPos(0, ground, z), EntitySpawnReason.COMMAND);
+        if (mob != null) {
+            mob.setNoAi(true);
+            mob.setCustomName(net.minecraft.network.chat.Component.literal(type.getDescription().getString() + " @" + z));
+            mob.setCustomNameVisible(true);
+        }
+        return mob;
+    }
+
+    private static int standIn;
+    private static net.minecraft.client.player.RemotePlayer fake;
+
+    /**
+     * Before the shots: a client-side stand-in player holding the rifle, charged, 3.5 blocks in front, photographed
+     * from its right side, its front and its back (how other players see the coils).
+     */
+    private static void standIn(Minecraft mc) {
+        standIn++;
+        mc.player.setYRot(0.0F);
+        mc.player.setXRot(10.0F);
+        mc.options.hideGui = true;
+        if (standIn == 1) {
+            fake = new net.minecraft.client.player.RemotePlayer(mc.level, new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "StandIn"));
+            fake.setPos(0.5, ground, 4.0);
+            fake.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new ItemStack(BuiltInRegistries.ITEM.getValue(Type95Addition.RIFLE)));
+            mc.level.addEntity(fake);
+            dev.type95addition.client.fx.GaussFx.sync(fake.getId(), true, 60);
+        }
+        float yaw = standIn < 7 ? 90.0F : standIn < 12 ? 180.0F : 0.0F;
+        fake.setYRot(yaw);
+        fake.setYHeadRot(yaw);
+        fake.yBodyRot = fake.yBodyRotO = fake.yHeadRotO = yaw;
+        fake.setXRot(0.0F);
+        if (standIn == 6) {
+            shot(mc, "gauss0_standin_side");
+        }
+        if (standIn == 11) {
+            shot(mc, "gauss0_standin_front");
+        }
+        if (standIn == 16) {
+            shot(mc, "gauss0_standin_back");
+        }
+        if (standIn == 17) {
+            dev.type95addition.client.fx.GaussFx.sync(fake.getId(), false, 0);
+            mc.level.removeEntity(fake.getId(), net.minecraft.world.entity.Entity.RemovalReason.DISCARDED);
+            mc.options.hideGui = false;
+        }
+    }
+
+    private static void gauss(Minecraft mc) {
+        if (standIn < 17) {
+            standIn(mc);
+            return;
+        }
+        after++;
+        if (gaussShot == 0 || after < 80 + 46 + 2) {
+            mc.player.setYRot(0.0F);
+            mc.player.setXRot((float)Math.toDegrees(Math.atan(GAUSS_SLOPE)));
+        } else if (after == 80 + 46 + 2) {
+            // the line from the side, as someone standing next to it sees it
+            mc.options.setCameraType(CameraType.FIRST_PERSON);
+            mc.options.hideGui = true;
+            IntegratedServer server = mc.getSingleplayerServer();
+            server.execute(() -> server.getPlayerList().getPlayers().get(0).teleportTo(server.overworld(), 12.5, ground, 16.0, Set.of(),
+                75.0F, 8.0F, false));
+        }
+        if (after == 1) {
+            // superflat's slimes would wander into the line
+            IntegratedServer server = mc.getSingleplayerServer();
+            server.execute(() -> server.overworld().getEntitiesOfClass(net.minecraft.world.entity.monster.Slime.class,
+                new AABB(-200, -100, -200, 200, 100, 300)).forEach(net.minecraft.world.entity.Entity::discard));
+        }
+        // shot 1: a tap (stage 1: through 2 mobs); shot 2 (from tick 80): full charge (through 6)
+        int start = gaussShot == 0 ? 5 : 80;
+        int release = gaussShot == 0 ? start + 10 : start + 46;
+        mc.options.keyUse.setDown(after >= start && after < release);
+        int held = ChargeClient.gaussHeld();
+        if (held == 1) {
+            log("ok: right click started a Gauss charge (shot " + (gaussShot + 1) + ")");
+        }
+        if (gaussShot == 0 && held == 6) {
+            shot(mc, "gauss1_stage1");
+            log("mobs outlined in line (stage 1): " + dev.type95addition.client.fx.GaussFx.targets());
+        }
+        if (gaussShot == 1) {
+            if (held == 28) {
+                shot(mc, "gauss2_stage2");
+            }
+            if (held == 42) {
+                shot(mc, "gauss2_full_first_person");
+                log("mobs outlined in line (full): " + dev.type95addition.client.fx.GaussFx.targets());
+                mc.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+            }
+            if (held == 44) {
+                shot(mc, "gauss2_full_front");
+                mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+            }
+        }
+        if (after == release) {
+            log("released Gauss shot " + (gaussShot + 1));
+        }
+        for (int t : new int[] {1, 3, 8, 16, 26}) {
+            if (after == release + t) {
+                shot(mc, "gauss" + (gaussShot + 1) + "_after_" + t);
+            }
+        }
+        if (after == release + 30) {
+            gaussReport(mc, "after shot " + (gaussShot + 1));
+            if (gaussShot == 0) {
+                gaussShot = 1;
+                mc.options.setCameraType(CameraType.FIRST_PERSON);
+            }
+        }
+        if (gaussShot == 1 && after == 80 + 46 + 40) {
+            mc.options.hideGui = false;
+            mc.setScreen(new dev.type95addition.client.LightningScreen());
+        }
+        if (gaussShot == 1 && after == 80 + 46 + 50) {
+            shot(mc, "gauss_settings_screen");
+        }
+        if (gaussShot == 1 && after == 80 + 46 + 56) {
+            mc.setScreen(null);
+            log("done");
+            mc.stop();
+        }
+    }
+
+    private static void gaussReport(Minecraft mc, String when) {
+        IntegratedServer server = mc.getSingleplayerServer();
+        server.execute(() -> {
+            ServerLevel level = server.overworld();
+            StringBuilder alive = new StringBuilder();
+            for (var mob : level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, new AABB(-5, ground - 2, 0, 5, ground + 5, 60))) {
+                alive.append(" [").append(mob.getCustomName() == null ? mob.getType().toShortString() : mob.getCustomName().getString())
+                    .append(" ").append(mob.getHealth()).append(" hp]");
+            }
+            log(when + ": alive" + alive);
+            log(when + ": glass at the line " + level.getBlockState(new BlockPos(0, ground + 1, 12)).getBlock()
+                + ", planks " + level.getBlockState(new BlockPos(0, ground + 1, 14)).getBlock()
+                + ", wool " + level.getBlockState(new BlockPos(0, ground + 1, 16)).getBlock()
+                + ", leaves " + level.getBlockState(new BlockPos(0, ground, 18)).getBlock()
+                + ", stone " + level.getBlockState(new BlockPos(0, ground, GAUSS_STONE)).getBlock());
+        });
     }
 
     // ---- The original Explosion Formula, for comparison (-Dt95.clienttest.og=true) ---------------------------------

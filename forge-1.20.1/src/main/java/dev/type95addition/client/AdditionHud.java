@@ -17,6 +17,10 @@ import net.minecraft.world.phys.HitResult;
  */
 public final class AdditionHud {
     private static final int EXPLOSION_COLOUR = 0xFFFF8A3D;
+    private static final int HOMING_COLOUR = 0xFFFF2E6E;
+    private static final int GAUSS_COLOUR = 0xFF7FD4FF;
+    /** The Gauss Formula's stages: blue, bright blue, white (like the coils). */
+    private static final int[] GAUSS_STAGES = {0xFF2A5BFF, 0xFF4CC2FF, 0xFFF4FBFF};
 
     private AdditionHud() {
     }
@@ -37,10 +41,20 @@ public final class AdditionHud {
         MarkFx.hud(g, partial);
         Font font = mc.font;
         Palette palette = ClientConfig.palette;
-        int colour = ClientConfig.lightning ? 0xFF000000 | palette.glow : EXPLOSION_COLOUR;
+        int colour = switch (ClientConfig.ammo) {
+            case ClientConfig.LIGHTNING -> 0xFF000000 | palette.glow;
+            case ClientConfig.HOMING -> HOMING_COLOUR;
+            case ClientConfig.GAUSS -> GAUSS_COLOUR;
+            default -> EXPLOSION_COLOUR;
+        };
 
         // The ammo, right of the hotbar
-        Component ammo = Component.translatable(ClientConfig.lightning ? "ammo.type95_addition.lightning" : "ammo.type95_addition.explosion");
+        Component ammo = Component.translatable(switch (ClientConfig.ammo) {
+            case ClientConfig.LIGHTNING -> "ammo.type95_addition.lightning";
+            case ClientConfig.HOMING -> "ammo.type95_addition.homing";
+            case ClientConfig.GAUSS -> "ammo.type95_addition.gauss";
+            default -> "ammo.type95_addition.explosion";
+        });
         int x = w / 2 + 98;
         int y = h - 19;
         g.drawString(font, Component.translatable("hud.type95_addition.ammo", ammo), x, y, colour, true);
@@ -48,7 +62,7 @@ public final class AdditionHud {
             g.drawString(font, Component.translatable("hud.type95_addition.ammo_hint", AdditionClient.AMMO_KEY.getTranslatedKeyMessage(),
                 AdditionClient.SETTINGS_KEY.getTranslatedKeyMessage()), x, y - 11, 0xFFB0B0B0, true);
         }
-        if (ClientConfig.lightning && ChargeClient.cooldownTicks() > 0) {
+        if (ClientConfig.ammo != ClientConfig.EXPLOSION && ChargeClient.cooldownTicks() > 0) {
             int bw = font.width(Component.translatable("hud.type95_addition.ammo", ammo));
             g.fill(x, y + 10, x + bw, y + 11, 0x80000000);
             g.fill(x, y + 10, x + (int)(bw * ChargeClient.cooldownLeft()), y + 11, colour);
@@ -77,6 +91,42 @@ public final class AdditionHud {
             int pulse = c >= 1.0F && (mc.player.tickCount / 4 & 1) == 0 ? 0xFF000000 | palette.core : colour;
             g.drawCenteredString(font, label, w / 2, by + 6, pulse);
         }
+        int gauss = ChargeClient.gaussHeld();
+        if (gauss >= 0 && scoped < 0.5F) {
+            gaussBar(g, font, w, h, gauss, partial, mc.player.tickCount);
+        }
+    }
+
+    /**
+     * The Gauss Formula's charge, below and left of the crosshair (the aimed rifle's muzzle is just below it, to the
+     * right): three segments (blue, bright blue, white) and the mobs in line.
+     */
+    private static void gaussBar(GuiGraphics g, Font font, int w, int h, int held, float partial, int tick) {
+        int right = w / 2 - 10;
+        int bw = 66;
+        int bx = right - bw;
+        int by = h / 2 + 14;
+        int seg = (bw - 2 * 2) / 3;
+        float c = (held + partial) / dev.type95addition.world.GaussShot.STAGE_TICKS;
+        for (int i = 0; i < 3; i++) {
+            int sx = bx + i * (seg + 2);
+            g.fill(sx, by, sx + seg, by + 3, 0x90000000);
+            float fill = i == 2 ? (c >= 2.0F ? 1.0F : 0.0F) : Math.min(1.0F, Math.max(0.0F, c - i));
+            if (fill > 0.0F) {
+                g.fill(sx, by, sx + (int)(seg * fill), by + 3, GAUSS_STAGES[i]);
+            }
+        }
+        int stage = dev.type95addition.world.GaussShot.stage(held);
+        Component label = stage == 3
+            ? Component.translatable("hud.type95_addition.gauss_full")
+            : Component.translatable("hud.type95_addition.gauss_charge", stage);
+        int targets = dev.type95addition.client.fx.GaussFx.targets();
+        if (targets > 0) {
+            label = label.copy().append(" · ").append(Component.translatable("hud.type95_addition.gauss_targets", targets));
+        }
+        // (stage 1's deep blue is hard to read as text: the label starts at the ammo's own light blue)
+        int colour = stage == 1 || stage == 3 && (tick / 4 & 1) == 0 ? GAUSS_COLOUR : GAUSS_STAGES[stage - 1];
+        g.drawString(font, label, right - font.width(label), by + 6, colour, true);
     }
 
     /**

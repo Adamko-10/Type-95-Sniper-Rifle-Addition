@@ -29,6 +29,9 @@ public final class AddonNetwork {
         PayloadTypeRegistry.playS2C().register(StrikePayload.TYPE, StrikePayload.CODEC);
         PayloadTypeRegistry.playS2C().register(BoltPayload.TYPE, BoltPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(CooldownPayload.TYPE, CooldownPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(HomingPayload.TYPE, HomingPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(CrushPayload.TYPE, CrushPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(GaussPayload.TYPE, GaussPayload.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(ChargePayload.TYPE, (payload, context) ->
             LightningCasting.onCharge(context.player(), payload.action()));
         ServerPlayNetworking.registerGlobalReceiver(TunePayload.TYPE, (payload, context) ->
@@ -40,7 +43,7 @@ public final class AddonNetwork {
     public static void sendSettings(ServerPlayer player) {
         send(player, new SettingsPayload(ServerConfig.chargeTicks(), ServerConfig.maxPower(), ServerConfig.maxDamage(),
             ServerConfig.maxBolts(), ServerConfig.fire(), ServerConfig.terrain(), ServerConfig.blast(), ServerConfig.survival(),
-            (float)ServerConfig.range()));
+            (float)ServerConfig.range(), ServerConfig.gaussBlocks()));
     }
 
     public static void send(ServerPlayer player, CustomPacketPayload payload) {

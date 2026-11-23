@@ -5,7 +5,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvent;
 
-/** The Lightning Formula's own sounds (all synthesised by {@code dev/art/make_sounds.py}; see sounds.json). */
+/** The addon's own sounds (all synthesised by {@code dev/art/make_sounds.py} and {@code make_gauss_sounds.py}; see sounds.json). */
 public final class AddonSounds {
     public static final SoundEvent CHARGE_LOOP = register("charge_loop");
     public static final SoundEvent CHARGE_START = register("charge_start");
@@ -21,6 +21,10 @@ public final class AddonSounds {
     public static final SoundEvent DOME = register("dome");
     public static final SoundEvent MARK = register("mark");
     public static final SoundEvent SCOPE = register("scope");
+    public static final SoundEvent GAUSS_WHINE = register("gauss_whine");
+    public static final SoundEvent GAUSS_STAGE = register("gauss_stage");
+    public static final SoundEvent GAUSS_CRACK = register("gauss_crack");
+    public static final SoundEvent GAUSS_BOOM = register("gauss_boom");
 
     private AddonSounds() {
     }
